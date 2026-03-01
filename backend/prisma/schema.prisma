@@ -1,0 +1,305 @@
+// =============================================================================
+// LicitaBrasil - Prisma Schema
+// Brazilian Public Procurement Aggregator
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pg_trgm]
+}
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum Modalidade {
+  PREGAO_ELETRONICO
+  PREGAO_PRESENCIAL
+  CONCORRENCIA
+  CONCORRENCIA_ELETRONICA
+  TOMADA_DE_PRECOS
+  CONVITE
+  CONCURSO
+  LEILAO
+  DIALOGO_COMPETITIVO
+  DISPENSA
+  INEXIGIBILIDADE
+  CREDENCIAMENTO
+  RDC
+  OUTRA
+}
+
+enum Esfera {
+  FEDERAL
+  ESTADUAL
+  MUNICIPAL
+}
+
+enum StatusLicitacao {
+  PUBLICADA
+  ABERTA
+  EM_ANDAMENTO
+  SUSPENSA
+  ADIADA
+  ENCERRADA
+  ANULADA
+  REVOGADA
+  DESERTA
+  FRACASSADA
+  HOMOLOGADA
+  ADJUDICADA
+}
+
+enum TipoLicitacao {
+  COMPRA
+  SERVICO
+  OBRA
+  SERVICO_ENGENHARIA
+  ALIENACAO
+  CONCESSAO
+  PERMISSAO
+  LOCACAO
+  OUTRO
+}
+
+enum FrequenciaAlerta {
+  TEMPO_REAL
+  DIARIO
+  SEMANAL
+}
+
+// =============================================================================
+// Models
+// =============================================================================
+
+/// Licitacao - Core model representing a public procurement process
+model Licitacao {
+  id                 String          @id @default(cuid())
+  numeroEdital       String?
+  numeroProcesso     String?
+  codigoUASG         String?
+  codigoPNCP         String?         @unique
+  modalidade         Modalidade
+  tipo               TipoLicitacao
+  natureza           String?
+  regime             String?
+  criterioJulgamento String?
+  orgao              String
+  orgaoSigla         String?
+  esfera             Esfera
+  uf                 String?
+  municipio          String?
+  objeto             String
+  objetoResumido     String?
+  valorEstimado      Decimal?
+  valorMinimo        Decimal?
+  valorMaximo        Decimal?
+  dataPublicacao     DateTime
+  dataAbertura       DateTime?
+  dataEncerramento   DateTime?
+  dataResultado      DateTime?
+  segmento           String?
+  cnae               String[]
+  palavrasChave      String[]
+  urlEdital          String?
+  urlAnexos          String[]
+  status             StatusLicitacao
+  situacao           String?
+  fonteOrigem        String
+  urlOrigem          String
+  hashConteudo       String          @unique
+  searchVector       Unsupported("tsvector")?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  // Relations
+  itens         ItemLicitacao[]
+  documentos    Documento[]
+  historico     HistoricoStatus[]
+  alertaMatches AlertaMatch[]
+  favoritos     Favorito[]
+
+  // Indexes for search performance
+  @@index([searchVector], type: Gin)
+  @@index([esfera, uf, status])
+  @@index([modalidade, dataAbertura])
+  @@index([segmento])
+  @@index([dataPublicacao])
+  @@index([fonteOrigem])
+}
+
+/// ItemLicitacao - Individual item within a procurement process
+model ItemLicitacao {
+  id              String   @id @default(cuid())
+  licitacaoId     String
+  numero          Int
+  descricao       String
+  quantidade      Decimal?
+  unidade         String?
+  valorUnitario   Decimal?
+  valorTotal      Decimal?
+  codigoCatalogo  String?
+
+  criadoEm DateTime @default(now())
+
+  // Relations
+  licitacao Licitacao @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
+
+  @@index([licitacaoId])
+}
+
+/// Documento - Documents attached to a procurement process
+model Documento {
+  id          String  @id @default(cuid())
+  licitacaoId String
+  tipo        String
+  nome        String
+  url         String
+  tamanho     Int?
+  formato     String?
+
+  criadoEm DateTime @default(now())
+
+  // Relations
+  licitacao Licitacao @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
+
+  @@index([licitacaoId])
+}
+
+/// HistoricoStatus - Status change history for a procurement process
+model HistoricoStatus {
+  id              String          @id @default(cuid())
+  licitacaoId     String
+  statusAnterior  StatusLicitacao?
+  statusNovo      StatusLicitacao
+  observacao      String?
+  dataAlteracao   DateTime        @default(now())
+
+  // Relations
+  licitacao Licitacao @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
+
+  @@index([licitacaoId])
+}
+
+/// Usuario - System user (companies/individuals monitoring procurements)
+model Usuario {
+  id       String  @id @default(cuid())
+  email    String  @unique
+  nome     String
+  empresa  String?
+  cnpj     String?
+  senha    String
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  // Relations
+  alertas      Alerta[]
+  favoritos    Favorito[]
+  buscasSalvas BuscaSalva[]
+}
+
+/// Alerta - User-defined alert for matching procurements
+model Alerta {
+  id              String            @id @default(cuid())
+  usuarioId       String
+  palavrasChave   String[]
+  modalidades     Modalidade[]
+  esferas         Esfera[]
+  estados         String[]
+  municipios      String[]
+  segmentos       String[]
+  valorMinimo     Decimal?
+  valorMaximo     Decimal?
+  ativo           Boolean           @default(true)
+  frequencia      FrequenciaAlerta
+  canalNotificacao String[]
+  ultimoEnvio     DateTime?
+  totalEnviados   Int               @default(0)
+
+  criadoEm DateTime @default(now())
+
+  // Relations
+  usuario Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  matches AlertaMatch[]
+
+  @@index([usuarioId])
+  @@index([ativo, frequencia])
+}
+
+/// AlertaMatch - Junction between Alerta and Licitacao when a match occurs
+model AlertaMatch {
+  id          String   @id @default(cuid())
+  alertaId    String
+  licitacaoId String
+  enviadoEm   DateTime @default(now())
+
+  // Relations
+  alerta    Alerta    @relation(fields: [alertaId], references: [id], onDelete: Cascade)
+  licitacao Licitacao @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
+
+  @@unique([alertaId, licitacaoId])
+  @@index([alertaId])
+  @@index([licitacaoId])
+}
+
+/// Favorito - User-saved procurement bookmarks
+model Favorito {
+  id          String   @id @default(cuid())
+  usuarioId   String
+  licitacaoId String
+  notas       String?
+  tags        String[]
+
+  criadoEm DateTime @default(now())
+
+  // Relations
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  licitacao Licitacao @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, licitacaoId])
+  @@index([usuarioId])
+  @@index([licitacaoId])
+}
+
+/// BuscaSalva - Saved search queries with filters
+model BuscaSalva {
+  id        String @id @default(cuid())
+  usuarioId String
+  nome      String
+  filtros   Json
+
+  criadoEm DateTime @default(now())
+
+  // Relations
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+}
+
+/// FonteDados - Data source configuration for procurement scrapers/APIs
+model FonteDados {
+  id                String   @id @default(cuid())
+  nome              String   @unique
+  url               String
+  tipo              String   // API, SCRAPING, RSS
+  esfera            Esfera
+  ativo             Boolean  @default(true)
+  ultimaColeta      DateTime?
+  ultimoSucesso     DateTime?
+  ultimaFalha       DateTime?
+  totalColetados    Int      @default(0)
+  totalErros        Int      @default(0)
+  intervaloMinutos  Int      @default(30)
+  configuracao      Json?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}

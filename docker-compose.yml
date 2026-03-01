@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: licitabrasil
+      POSTGRES_USER: licitabrasil
+      POSTGRES_PASSWORD: licitabrasil_dev
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U licitabrasil"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://licitabrasil:licitabrasil_dev@postgres:5432/licitabrasil
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: licitabrasil-jwt-secret-change-in-production
+      JWT_REFRESH_SECRET: licitabrasil-refresh-secret-change-in-production
+      PORT: "3001"
+      NODE_ENV: development
+      CORS_ORIGIN: http://localhost:5173
+      LOG_LEVEL: info
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["node", "--import", "tsx", "src/jobs/worker.ts"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://licitabrasil:licitabrasil_dev@postgres:5432/licitabrasil
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: licitabrasil-jwt-secret-change-in-production
+      JWT_REFRESH_SECRET: licitabrasil-refresh-secret-change-in-production
+      NODE_ENV: development
+      LOG_LEVEL: info
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  redisdata:
