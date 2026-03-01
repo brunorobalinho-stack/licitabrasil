@@ -276,6 +276,15 @@ export abstract class BaseScraper {
     return MODALIDADE_MAP[keyAccented] ?? MODALIDADE_MAP[key] ?? Modalidade.OUTRA;
   }
 
+  normalizeEsfera(str: string): Esfera {
+    if (!str) return this.getEsfera();
+    const key = str.trim().toUpperCase();
+    if (key === 'FEDERAL' || key === 'F') return Esfera.FEDERAL;
+    if (key === 'ESTADUAL' || key === 'E') return Esfera.ESTADUAL;
+    if (key === 'MUNICIPAL' || key === 'M') return Esfera.MUNICIPAL;
+    return this.getEsfera();
+  }
+
   normalizeStatus(str: string): StatusLicitacao {
     if (!str) return StatusLicitacao.PUBLICADA;
     const key = str.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -350,7 +359,7 @@ export abstract class BaseScraper {
       criterioJulgamento: raw.criterioJulgamento ?? null,
       orgao: raw.orgao,
       orgaoSigla: raw.orgaoSigla ?? null,
-      esfera: this.getEsfera(),
+      esfera: this.normalizeEsfera(raw.esfera),
       uf: raw.uf ?? null,
       municipio: raw.municipio ?? null,
       objeto: raw.objeto,

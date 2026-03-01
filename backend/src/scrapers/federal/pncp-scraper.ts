@@ -10,21 +10,23 @@ interface PNCPOrgaoEntidade {
   cnpj: string;
   razaoSocial: string;
   poderId?: string;
-  esferaId?: string;
-  municipio?: {
-    id: number;
-    nome: string;
-    uf?: {
-      sigla: string;
-      nome: string;
-    };
-  };
+  esferaId?: string; // "F" = Federal, "E" = Estadual, "M" = Municipal
+}
+
+interface PNCPUnidadeOrgao {
+  ufSigla?: string;
+  ufNome?: string;
+  municipioNome?: string;
+  nomeUnidade?: string;
+  codigoUnidade?: string;
+  codigoIbge?: string;
 }
 
 interface PNCPItem {
   // Identification
   numeroControlePNCP: string;
   orgaoEntidade: PNCPOrgaoEntidade;
+  unidadeOrgao?: PNCPUnidadeOrgao;
   anoCompra?: number;
   sequencialCompra?: number;
   numeroCompra?: string;
@@ -36,7 +38,7 @@ interface PNCPItem {
   modalidadeNome?: string;
   tipoInstrumentoConvocatorioNome?: string;
   modoDisputaNome?: string;
-  amparoLegalNome?: string;
+  amparoLegal?: { codigo?: number; nome?: string; descricao?: string };
   criterioJulgamentoNome?: string;
 
   // Content
@@ -145,9 +147,13 @@ export class PNCPScraper extends BaseScraper {
     return Esfera.FEDERAL;
   }
 
+  // PNCP API requires codigoModalidadeContratacao, so we iterate over all.
+  // Focus on the most common/relevant modalidades first.
+  private static readonly MODALIDADE_CODES = [6, 8, 4, 9, 1, 5, 7, 11, 12, 2, 3, 10, 13];
+
   async fetchLicitacoes(params: ScrapingParams): Promise<RawLicitacao[]> {
     const results: RawLicitacao[] = [];
-    const pageSize = Math.min(params.pageSize ?? 500, 500);
+    const pageSize = Math.max(Math.min(params.pageSize ?? 50, 50), 10); // API: min=10, max=50
 
     // Default date range: last 24 hours
     const now = new Date();
@@ -155,68 +161,87 @@ export class PNCPScraper extends BaseScraper {
     const dataInicial = params.dataInicio ?? yesterday.toISOString().split('T')[0];
     const dataFinal = params.dataFim ?? now.toISOString().split('T')[0];
 
-    let page = params.page ?? 1;
-    let hasMore = true;
+    // If a specific modalidade is requested, only fetch that one
+    const modalidades = params.codigoModalidadeContratacao
+      ? [Number(params.codigoModalidadeContratacao)]
+      : PNCPScraper.MODALIDADE_CODES;
 
     this.logger.info(
-      { dataInicial, dataFinal, pageSize },
+      { dataInicial, dataFinal, pageSize, modalidades: modalidades.length },
       'Fetching licitacoes from PNCP',
     );
 
-    while (hasMore) {
-      const url = this.buildUrl(dataInicial, dataFinal, page, pageSize, params);
-      this.logger.debug({ url, page }, 'Requesting PNCP page');
+    for (const codModalidade of modalidades) {
+      let page = params.page ?? 1;
+      let hasMore = true;
 
-      const response = await this.withRetry(async () => {
-        const res = await fetch(url, {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'LicitaBrasil/1.0',
-          },
-        });
+      while (hasMore) {
+        const url = this.buildUrl(dataInicial, dataFinal, page, pageSize, codModalidade);
+        this.logger.debug({ url, page, codModalidade }, 'Requesting PNCP page');
 
-        if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          throw new Error(`PNCP API returned ${res.status}: ${body.slice(0, 200)}`);
-        }
-
-        return res.json() as Promise<PNCPResponse>;
-      }, `PNCP page ${page}`);
-
-      const items = response.data ?? response.items ?? [];
-
-      if (items.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      for (const item of items) {
+        let response: PNCPResponse;
         try {
-          const raw = this.mapToRawLicitacao(item);
-          results.push(raw);
+          response = await this.withRetry(async () => {
+            const res = await fetch(url, {
+              headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'LicitaBrasil/1.0',
+              },
+            });
+
+            if (!res.ok) {
+              const body = await res.text().catch(() => '');
+              throw new Error(`PNCP API returned ${res.status}: ${body.slice(0, 200)}`);
+            }
+
+            return res.json() as Promise<PNCPResponse>;
+          }, `PNCP modalidade=${codModalidade} page=${page}`);
         } catch (err) {
           this.logger.warn(
-            { err, pncpId: item.numeroControlePNCP },
-            'Failed to map PNCP item',
+            { err, codModalidade, page },
+            'Failed to fetch PNCP page, skipping modalidade',
           );
+          break;
+        }
+
+        const items = response.data ?? response.items ?? [];
+
+        if (items.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        for (const item of items) {
+          try {
+            const raw = this.mapToRawLicitacao(item);
+            results.push(raw);
+          } catch (err) {
+            this.logger.warn(
+              { err, pncpId: item.numeroControlePNCP },
+              'Failed to map PNCP item',
+            );
+          }
+        }
+
+        this.logger.info(
+          { codModalidade, page, itemsOnPage: items.length, totalSoFar: results.length },
+          'PNCP page fetched',
+        );
+
+        // Determine if more pages exist
+        const totalPages = response.totalPaginas;
+        if (totalPages != null && page >= totalPages) {
+          hasMore = false;
+        } else if (items.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+          await this.rateLimit();
         }
       }
 
-      this.logger.info(
-        { page, itemsOnPage: items.length, totalSoFar: results.length },
-        'PNCP page fetched',
-      );
-
-      // Determine if more pages exist
-      const totalPages = response.totalPaginas;
-      if (totalPages != null && page >= totalPages) {
-        hasMore = false;
-      } else if (items.length < pageSize) {
-        hasMore = false;
-      } else {
-        page++;
-        await this.rateLimit();
-      }
+      // Rate limit between modalidades too
+      await this.rateLimit();
     }
 
     this.logger.info({ total: results.length }, 'PNCP fetch complete');
@@ -230,21 +255,15 @@ export class PNCPScraper extends BaseScraper {
     dataFinal: string,
     pagina: number,
     tamanhoPagina: number,
-    params: ScrapingParams,
+    codModalidade: number,
   ): string {
     const searchParams = new URLSearchParams({
       dataInicial: this.formatPNCPDate(dataInicial),
       dataFinal: this.formatPNCPDate(dataFinal),
+      codigoModalidadeContratacao: String(codModalidade),
       pagina: String(pagina),
       tamanhoPagina: String(tamanhoPagina),
     });
-
-    if (params.codigoModalidadeContratacao) {
-      searchParams.set(
-        'codigoModalidadeContratacao',
-        String(params.codigoModalidadeContratacao),
-      );
-    }
 
     return `${this.baseUrl}?${searchParams.toString()}`;
   }
@@ -259,9 +278,16 @@ export class PNCPScraper extends BaseScraper {
 
   private mapToRawLicitacao(item: PNCPItem): RawLicitacao {
     const orgao = item.orgaoEntidade?.razaoSocial ?? 'Orgão não informado';
-    const uf = item.orgaoEntidade?.municipio?.uf?.sigla ?? null;
-    const municipio = item.orgaoEntidade?.municipio?.nome ?? null;
+    const uf = item.unidadeOrgao?.ufSigla ?? null;
+    const municipio = item.unidadeOrgao?.municipioNome ?? null;
     const modalidade = PNCP_MODALIDADE_MAP[item.modalidadeId] ?? Modalidade.OUTRA;
+
+    // Map esferaId: "F" → FEDERAL, "E" → ESTADUAL, "M" → MUNICIPAL
+    const esferaId = item.orgaoEntidade?.esferaId?.toUpperCase();
+    let esfera: string;
+    if (esferaId === 'E') esfera = 'ESTADUAL';
+    else if (esferaId === 'M') esfera = 'MUNICIPAL';
+    else esfera = 'FEDERAL';
 
     const urlOrigem = item.linkSistemaOrigem
       ?? `https://pncp.gov.br/app/editais/${item.numeroControlePNCP}`;
@@ -273,12 +299,12 @@ export class PNCPScraper extends BaseScraper {
       codigoPNCP: item.numeroControlePNCP ?? null,
       modalidade: modalidade as string,
       tipo: this.inferTipo(item.objetoCompra),
-      natureza: item.amparoLegalNome ?? null,
+      natureza: item.amparoLegal?.nome ?? null,
       regime: item.modoDisputaNome ?? null,
       criterioJulgamento: item.criterioJulgamentoNome ?? null,
       orgao,
       orgaoSigla: this.extractSigla(orgao),
-      esfera: 'FEDERAL',
+      esfera,
       uf,
       municipio,
       objeto: item.objetoCompra ?? 'Objeto não informado',
