@@ -34,3 +34,9 @@ prisma/*.db-journal
 .idea/
 *.swp
 *.swo
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/

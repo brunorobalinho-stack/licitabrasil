@@ -82,6 +82,37 @@ services:
     depends_on:
       - backend
 
+  # --- Backoffice Services ---
+
+  backoffice-api:
+    build:
+      context: ./backoffice/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      BACKOFFICE_DATABASE_URL: postgresql://licitabrasil:licitabrasil_dev@postgres:5432/licitabrasil_backoffice
+      BACKOFFICE_REDIS_URL: redis://redis:6379/1
+      BACKOFFICE_SECRET_KEY: backoffice-secret-change-in-production
+      BACKOFFICE_CORS_ORIGINS: '["http://localhost:5174"]'
+      BACKOFFICE_DEBUG: "true"
+
+  backoffice-frontend:
+    build:
+      context: ./backoffice/frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5174:80"
+    depends_on:
+      - backoffice-api
+
 volumes:
   pgdata:
   redisdata:

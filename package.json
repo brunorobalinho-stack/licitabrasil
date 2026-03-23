@@ -17,7 +17,11 @@
     "test": "cd backend && npm test",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "docker:build": "docker compose build"
+    "docker:build": "docker compose build",
+    "backoffice:api": "cd backoffice/backend && uvicorn app.main:app --reload --port 8000",
+    "backoffice:frontend": "cd backoffice/frontend && npm run dev",
+    "backoffice:seed": "cd backoffice/backend && python -m app.seed",
+    "backoffice:dev": "concurrently \"npm run backoffice:api\" \"npm run backoffice:frontend\""
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
