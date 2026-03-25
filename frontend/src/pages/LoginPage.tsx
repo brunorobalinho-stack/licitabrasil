@@ -79,9 +79,11 @@ export function LoginPage() {
           <Link to="/registro" className="font-medium text-primary hover:underline">Cadastre-se</Link>
         </p>
 
-        <div className="mt-4 rounded-lg bg-blue-50 p-3 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-          <strong>Demo:</strong> demo@licitabrasil.com.br / 123456
-        </div>
+        {import.meta.env.DEV && (
+          <div className="mt-4 rounded-lg bg-blue-50 p-3 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+            <strong>Demo:</strong> demo@licitabrasil.com.br / 123456
+          </div>
+        )}
       </div>
     </div>
   );

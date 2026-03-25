@@ -20,6 +20,7 @@ export function EmailsPage() {
         actionable_only: actionableOnly || undefined,
       })
       .then(setEmails)
+      .catch(() => setEmails([]))
       .finally(() => setLoading(false));
   }, [priorityFilter, actionableOnly]);
 

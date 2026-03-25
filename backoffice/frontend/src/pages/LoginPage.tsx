@@ -64,9 +64,11 @@ export function LoginPage() {
             </button>
           </form>
 
-          <p className="text-xs text-slate-400 text-center mt-6">
-            Demo: admin@licitabrasil.com / admin123
-          </p>
+          {import.meta.env.DEV && (
+            <p className="text-xs text-slate-400 text-center mt-6">
+              Demo: admin@licitabrasil.com / admin123
+            </p>
+          )}
         </div>
       </div>
     </div>

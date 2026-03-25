@@ -115,7 +115,7 @@ router.post('/refresh', asyncHandler(async (req, res) => {
   const { refreshToken } = refreshSchema.parse(req.body);
 
   try {
-    const decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as AuthPayload;
+    const decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET, { algorithms: ['HS256'] }) as AuthPayload;
     const tokens = generateTokens({ userId: decoded.userId, email: decoded.email });
     res.json(tokens);
   } catch {

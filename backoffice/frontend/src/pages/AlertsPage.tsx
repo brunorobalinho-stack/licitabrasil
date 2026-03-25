@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Bell, CheckCheck, Filter } from 'lucide-react';
 import { api } from '../services/api';
 import { Card, CardContent } from '../components/ui/Card';
@@ -11,12 +11,12 @@ export function AlertsPage() {
   const [loading, setLoading] = useState(true);
   const [unreadOnly, setUnreadOnly] = useState(false);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
-    api.listAlerts(unreadOnly).then(setAlerts).finally(() => setLoading(false));
-  };
+    api.listAlerts(unreadOnly).then(setAlerts).catch(() => setAlerts([])).finally(() => setLoading(false));
+  }, [unreadOnly]);
 
-  useEffect(load, [unreadOnly]);
+  useEffect(load, [load]);
 
   const markRead = async (id: number) => {
     await api.markAlertRead(id);

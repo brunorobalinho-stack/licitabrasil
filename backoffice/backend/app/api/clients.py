@@ -1,10 +1,15 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.models import Client, User
 from app.models.schemas import ClientCreate, ClientOut
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -25,7 +30,11 @@ def create_client(
         raise HTTPException(status_code=409, detail="CNPJ já cadastrado")
     client = Client(**data.model_dump())
     db.add(client)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="CNPJ já cadastrado (conflito)")
     db.refresh(client)
     return client
 

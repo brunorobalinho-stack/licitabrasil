@@ -109,14 +109,14 @@ def run_salary_alerts(db: Session) -> dict:
         # Check if there's enough cash to cover payroll
         month_revenue = db.query(func.sum(Transaction.amount)).filter(
             Transaction.type == TransactionType.RECEITA,
-            Transaction.date >= current_month_start,
-            Transaction.date <= today,
+            Transaction.transaction_date >= current_month_start,
+            Transaction.transaction_date <= today,
         ).scalar() or Decimal("0")
 
         month_expenses = db.query(func.sum(Transaction.amount)).filter(
             Transaction.type == TransactionType.DESPESA,
-            Transaction.date >= current_month_start,
-            Transaction.date <= today,
+            Transaction.transaction_date >= current_month_start,
+            Transaction.transaction_date <= today,
         ).scalar() or Decimal("0")
 
         available = month_revenue - month_expenses
@@ -154,8 +154,12 @@ def run_salary_alerts(db: Session) -> dict:
         }
 
     except Exception as e:
+        db.rollback()
         agent_run.status = "failed"
         agent_run.finished_at = datetime.now(timezone.utc)
         agent_run.result_summary = str(e)
-        db.commit()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
         raise

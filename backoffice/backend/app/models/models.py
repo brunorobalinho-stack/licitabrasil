@@ -1,5 +1,4 @@
-from datetime import date, datetime, timezone
-from decimal import Decimal
+from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
 from sqlalchemy import (
@@ -160,7 +159,7 @@ class Transaction(Base):
     category = Column(String(100), nullable=False)
     description = Column(String(500))
     amount = Column(Numeric(14, 2), nullable=False)
-    date = Column(Date, nullable=False)
+    transaction_date = Column("date", Date, nullable=False)
     is_recurring = Column(Boolean, default=False)
     recurrence_months = Column(Integer)
 

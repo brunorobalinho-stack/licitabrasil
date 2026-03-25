@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Bell, CheckCheck } from 'lucide-react';
 import { api } from '../../services/api';
 import { Card, CardHeader, CardContent } from '../ui/Card';
@@ -10,24 +10,32 @@ export function AlertsList({ limit = 10 }: { limit?: number }) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
-    api.listAlerts(true).then((data) => {
-      setAlerts(data.slice(0, limit));
-      setLoading(false);
-    });
-  };
+    api.listAlerts(true)
+      .then((data) => setAlerts(data.slice(0, limit)))
+      .catch(() => setAlerts([]))
+      .finally(() => setLoading(false));
+  }, [limit]);
 
-  useEffect(load, [limit]);
+  useEffect(load, [load]);
 
   const markRead = async (id: number) => {
-    await api.markAlertRead(id);
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
+    try {
+      await api.markAlertRead(id);
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    } catch {
+      // Revert optimistic removal not needed since we didn't remove yet
+    }
   };
 
   const markAllRead = async () => {
-    await api.markAllAlertsRead();
-    setAlerts([]);
+    try {
+      await api.markAllAlertsRead();
+      setAlerts([]);
+    } catch {
+      // Keep current state on failure
+    }
   };
 
   if (loading) return <Spinner />;

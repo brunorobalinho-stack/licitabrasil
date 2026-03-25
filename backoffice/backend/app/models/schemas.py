@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 from app.models.models import (
     AlertType, ContractStatus, EmailPriority, TransactionType,
@@ -165,7 +165,7 @@ class TransactionCreate(BaseModel):
     category: str
     description: str | None = None
     amount: Decimal
-    date: date
+    transaction_date: date
     is_recurring: bool = False
     recurrence_months: int | None = None
 
@@ -177,7 +177,7 @@ class TransactionOut(BaseModel):
     category: str
     description: str | None
     amount: Decimal
-    date: date
+    transaction_date: date
     is_recurring: bool
 
     class Config:

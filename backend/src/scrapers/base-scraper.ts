@@ -383,25 +383,18 @@ export abstract class BaseScraper {
       hashConteudo: hash,
     };
 
-    const existing = await prisma.licitacao.findUnique({
+    const { hashConteudo: _hash, ...updateData } = data;
+
+    const result = await prisma.licitacao.upsert({
       where: { hashConteudo: hash },
-      select: { id: true },
+      update: updateData,
+      create: data,
+      select: { criadoEm: true, atualizadoEm: true },
     });
 
-    if (existing) {
-      await prisma.licitacao.update({
-        where: { hashConteudo: hash },
-        data: {
-          ...data,
-          // Preserve the original id and hashConteudo
-          hashConteudo: undefined,
-        },
-      });
-      return 'updated';
-    }
-
-    await prisma.licitacao.create({ data });
-    return 'created';
+    // If criadoEm equals atualizadoEm (within 1s), it was just created
+    const wasCreated = Math.abs(result.criadoEm.getTime() - result.atualizadoEm.getTime()) < 1000;
+    return wasCreated ? 'created' : 'updated';
   }
 
   // ---- Ensure FonteDados record exists ----

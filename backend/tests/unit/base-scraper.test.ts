@@ -22,6 +22,10 @@ vi.mock('../../src/lib/prisma.js', () => ({
       findUnique: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({ id: 'test-id' }),
       update: vi.fn().mockResolvedValue({ id: 'test-id' }),
+      upsert: vi.fn().mockImplementation(() => {
+        const now = new Date();
+        return Promise.resolve({ criadoEm: now, atualizadoEm: now });
+      }),
     },
   },
 }));

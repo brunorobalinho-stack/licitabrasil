@@ -6,15 +6,15 @@ class Settings(BaseSettings):
     APP_NAME: str = "LicitaBrasil Backoffice"
     DEBUG: bool = False
 
-    # Database
-    DATABASE_URL: str = "postgresql://licitabrasil:licitabrasil_dev@localhost:5432/licitabrasil_backoffice"
+    # Database (required - must be set via environment)
+    DATABASE_URL: str
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/1"
     CACHE_TTL: int = 300  # 5 minutes
 
-    # Auth
-    SECRET_KEY: str = "backoffice-secret-change-in-production"
+    # Auth (required - must be set via environment)
+    SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8h workday
 
     # CORS

@@ -22,7 +22,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
     return;
   }
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET) as AuthPayload;
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as AuthPayload;
     req.user = decoded;
     next();
   } catch {
@@ -34,7 +34,7 @@ export const optionalAuth = (req: Request, _res: Response, next: NextFunction): 
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (token) {
     try {
-      req.user = jwt.verify(token, env.JWT_SECRET) as AuthPayload;
+      req.user = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as AuthPayload;
     } catch {
       /* ignore invalid tokens */
     }

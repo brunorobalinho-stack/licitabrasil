@@ -17,12 +17,18 @@ function formatBRL(value: number): string {
 export function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.summary().then(setSummary).finally(() => setLoading(false));
+    api.summary()
+      .then(setSummary)
+      .catch(() => setError('Erro ao carregar dashboard'))
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading || !summary) return <Spinner size="lg" />;
+  if (loading) return <Spinner size="lg" />;
+  if (error) return <p className="text-red-500 p-8">{error}</p>;
+  if (!summary) return <Spinner size="lg" />;
 
   return (
     <div className="space-y-6">

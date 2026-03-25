@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
 from app.core.database import get_db
-from app.models.models import Client, EmailPriority, EmailRecord, User
+from app.models.models import EmailPriority, EmailRecord, User
 from app.models.schemas import EmailRecordOut
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/emails", tags=["emails"])
 
 
@@ -15,11 +18,11 @@ def list_emails(
     priority: EmailPriority | None = None,
     unread_only: bool = False,
     actionable_only: bool = False,
-    limit: int = 50,
+    limit: int = Query(default=50, le=500),
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
-    query = db.query(EmailRecord)
+    query = db.query(EmailRecord).options(joinedload(EmailRecord.client))
     if client_id:
         query = query.filter(EmailRecord.client_id == client_id)
     if priority:
@@ -47,7 +50,8 @@ def mark_email_read(
     _user: User = Depends(get_current_user),
 ):
     email = db.query(EmailRecord).filter(EmailRecord.id == email_id).first()
-    if email:
-        email.is_read = True
-        db.commit()
+    if not email:
+        raise HTTPException(status_code=404, detail="E-mail não encontrado")
+    email.is_read = True
+    db.commit()
     return {"ok": True}

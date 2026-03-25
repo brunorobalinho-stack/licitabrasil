@@ -1,15 +1,19 @@
 """Seed script to populate the database with sample data for development."""
 
+import logging
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from app.core.auth import hash_password
 from app.core.database import SessionLocal, Base, engine
 from app.models.models import (
-    Alert, AlertType, Client, Contract, ContractStatus,
-    EmailPriority, EmailRecord, Employee, PayrollRecord,
+    Client, Contract, ContractStatus,
+    EmailRecord, Employee, PayrollRecord,
     Transaction, TransactionType, User,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def seed():
@@ -19,7 +23,7 @@ def seed():
     try:
         # Check if already seeded
         if db.query(User).first():
-            print("Database already seeded, skipping.")
+            logger.info("Database already seeded, skipping.")
             return
 
         # --- Users ---
@@ -174,25 +178,25 @@ def seed():
 
             db.add_all([
                 Transaction(client_id=clients[0].id, type=TransactionType.RECEITA,
-                           category="Medição de obra", amount=Decimal("75000.00"), date=m),
+                           category="Medição de obra", amount=Decimal("75000.00"), transaction_date=m),
                 Transaction(client_id=clients[1].id, type=TransactionType.RECEITA,
-                           category="Mensalidade SaaS", amount=Decimal("15000.00"), date=m,
+                           category="Mensalidade SaaS", amount=Decimal("15000.00"), transaction_date=m,
                            is_recurring=True, recurrence_months=1),
                 Transaction(client_id=clients[3].id, type=TransactionType.RECEITA,
-                           category="Consultoria", amount=Decimal("12000.00"), date=m,
+                           category="Consultoria", amount=Decimal("12000.00"), transaction_date=m,
                            is_recurring=True, recurrence_months=1),
                 Transaction(type=TransactionType.DESPESA, category="Folha de pagamento",
-                           amount=Decimal("35816.00"), date=m.replace(day=5),
+                           amount=Decimal("35816.00"), transaction_date=m.replace(day=5),
                            is_recurring=True, recurrence_months=1),
                 Transaction(type=TransactionType.DESPESA, category="Aluguel escritório",
-                           amount=Decimal("8500.00"), date=m.replace(day=1),
+                           amount=Decimal("8500.00"), transaction_date=m.replace(day=1),
                            is_recurring=True, recurrence_months=1),
                 Transaction(type=TransactionType.DESPESA, category="Fornecedores",
-                           amount=Decimal("22000.00") + Decimal(str(month_offset * 1500)), date=m),
+                           amount=Decimal("22000.00") + Decimal(str(month_offset * 1500)), transaction_date=m),
             ])
 
         db.commit()
-        print("Database seeded successfully!")
+        logger.info("Database seeded successfully!")
 
     finally:
         db.close()

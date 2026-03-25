@@ -18,7 +18,7 @@ export function ContractsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.listContracts(filter || undefined).then(setContracts).finally(() => setLoading(false));
+    api.listContracts(filter || undefined).then(setContracts).catch(() => setContracts([])).finally(() => setLoading(false));
   }, [filter]);
 
   return (

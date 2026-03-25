@@ -11,12 +11,17 @@ import type { MonthlySummary } from '../../types';
 export function CashFlowChart() {
   const [data, setData] = useState<MonthlySummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.monthlySummary(6).then(setData).finally(() => setLoading(false));
+    api.monthlySummary(6)
+      .then(setData)
+      .catch(() => setError('Erro ao carregar fluxo de caixa'))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <Spinner />;
+  if (error) return <Card><CardContent><p className="text-red-500 text-sm py-4">{error}</p></CardContent></Card>;
 
   const formatted = data.map((d) => ({
     ...d,

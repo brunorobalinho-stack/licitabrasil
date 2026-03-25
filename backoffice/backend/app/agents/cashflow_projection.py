@@ -27,11 +27,11 @@ def _get_monthly_totals(db: Session, months_back: int = 6) -> list[dict]:
 
     results = (
         db.query(
-            func.date_trunc("month", Transaction.date).label("month"),
+            func.date_trunc("month", Transaction.transaction_date).label("month"),
             Transaction.type,
             func.sum(Transaction.amount).label("total"),
         )
-        .filter(Transaction.date >= start)
+        .filter(Transaction.transaction_date >= start)
         .group_by("month", Transaction.type)
         .order_by("month")
         .all()
@@ -146,8 +146,12 @@ def run_cashflow_projection(db: Session, months_ahead: int = 6) -> dict:
         }
 
     except Exception as e:
+        db.rollback()
         agent_run.status = "failed"
         agent_run.finished_at = datetime.now(timezone.utc)
         agent_run.result_summary = str(e)
-        db.commit()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
         raise

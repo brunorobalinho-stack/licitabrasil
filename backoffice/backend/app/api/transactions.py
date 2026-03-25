@@ -1,14 +1,17 @@
+import logging
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.core.database import get_db
-from app.models.models import Transaction, TransactionType, User
-from app.models.schemas import CashFlowProjection, TransactionCreate, TransactionOut
+from app.models.models import Client, Transaction, TransactionType, User
+from app.models.schemas import TransactionCreate, TransactionOut
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 
@@ -18,7 +21,7 @@ def list_transactions(
     client_id: int | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
-    limit: int = 100,
+    limit: int = Query(default=100, le=500),
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
@@ -28,10 +31,10 @@ def list_transactions(
     if client_id:
         query = query.filter(Transaction.client_id == client_id)
     if start_date:
-        query = query.filter(Transaction.date >= start_date)
+        query = query.filter(Transaction.transaction_date >= start_date)
     if end_date:
-        query = query.filter(Transaction.date <= end_date)
-    return query.order_by(Transaction.date.desc()).limit(limit).all()
+        query = query.filter(Transaction.transaction_date <= end_date)
+    return query.order_by(Transaction.transaction_date.desc()).limit(limit).all()
 
 
 @router.post("/", response_model=TransactionOut, status_code=201)
@@ -40,22 +43,31 @@ def create_transaction(
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
+    if data.client_id:
+        client = db.query(Client).filter(Client.id == data.client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
     txn = Transaction(**data.model_dump())
     db.add(txn)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflito ao criar transação")
     db.refresh(txn)
     return txn
 
 
 @router.get("/monthly-summary")
 def monthly_summary(
-    months: int = 6,
+    months: int = Query(default=6, le=24),
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
     results = (
         db.query(
-            func.date_trunc("month", Transaction.date).label("month"),
+            func.date_trunc("month", Transaction.transaction_date).label("month"),
             Transaction.type,
             func.sum(Transaction.amount).label("total"),
         )

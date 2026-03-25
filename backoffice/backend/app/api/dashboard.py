@@ -1,5 +1,4 @@
 from datetime import date
-from decimal import Decimal
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
@@ -7,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.core.database import get_db
-from app.core.redis import cache_result
 from app.models.models import (
     Alert, Client, Contract, ContractStatus, EmailRecord,
     Employee, Transaction, TransactionType, User,
@@ -44,12 +42,12 @@ def get_summary(
 
     monthly_revenue = db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
         Transaction.type == TransactionType.RECEITA,
-        Transaction.date >= month_start,
+        Transaction.transaction_date >= month_start,
     ).scalar()
 
     monthly_expenses = db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
         Transaction.type == TransactionType.DESPESA,
-        Transaction.date >= month_start,
+        Transaction.transaction_date >= month_start,
     ).scalar()
 
     return DashboardSummary(

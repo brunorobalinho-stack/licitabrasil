@@ -117,8 +117,12 @@ def run_contract_tracker(db: Session) -> dict:
         }
 
     except Exception as e:
+        db.rollback()
         agent_run.status = "failed"
         agent_run.finished_at = datetime.now(timezone.utc)
         agent_run.result_summary = str(e)
-        db.commit()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
         raise
