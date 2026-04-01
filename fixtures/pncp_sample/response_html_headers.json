@@ -1,0 +1,17 @@
+{
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET,PUT,POST,DELETE,OPTIONS",
+  "access-control-allow-credentials": "true",
+  "access-control-allow-headers": "Content-Type,Authorization,X-Requested-With,Content-Length,Accept,Origin,",
+  "x-content-type-options": "nosniff",
+  "x-xss-protection": "0",
+  "cache-control": "no-cache, no-store, max-age=0, must-revalidate",
+  "pragma": "no-cache",
+  "expires": "0",
+  "x-frame-options": "DENY",
+  "content-type": "text/html;charset=UTF-8",
+  "content-language": "en",
+  "content-length": "360",
+  "date": "Mon, 09 Mar 2026 10:54:45 GMT",
+  "strict-transport-security": "max-age=15768000"
+}

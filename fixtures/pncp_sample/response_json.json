@@ -1,0 +1,1 @@
+{"timestamp":"2026-03-09T10:54:45.360+00:00","status":400,"error":"Bad Request","message":"Required parameter 'codigoModalidadeContratacao' is not present.","path":"/pncp-consulta/v1/contratacoes/publicacao"}

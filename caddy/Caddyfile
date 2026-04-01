@@ -1,0 +1,5 @@
+# Dev: localhost
+# Prod: trocar por domínio real (ex: licitabrasil.example.com)
+:80 {
+    reverse_proxy app:8000
+}

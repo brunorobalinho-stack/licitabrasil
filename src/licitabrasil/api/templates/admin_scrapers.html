@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Scrapers - LicitaBrasil{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+            <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            <h1 class="text-2xl font-bold">Status das Fontes</h1>
+        </div>
+        <a href="/admin/scrapers"
+            class="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            Atualizar
+        </a>
+    </div>
+
+    <!-- Resumo por fonte -->
+    <div class="overflow-hidden rounded-xl border bg-white shadow-sm dark:bg-gray-900 dark:border-gray-800 mb-8">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b bg-gray-50 dark:bg-gray-800/50">
+                    <th class="px-4 py-3 text-left font-medium">Fonte</th>
+                    <th class="px-4 py-3 text-center font-medium">Status</th>
+                    <th class="px-4 py-3 text-right font-medium">Novos</th>
+                    <th class="px-4 py-3 text-right font-medium">Sucesso</th>
+                    <th class="px-4 py-3 text-right font-medium">Erros</th>
+                    <th class="px-4 py-3 text-left font-medium">Última Execução</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y dark:divide-gray-800">
+                {% for f in fontes %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                    <td class="px-4 py-3 font-medium">{{ f.nome }}</td>
+                    <td class="px-4 py-3 text-center">
+                        {% if f.ultimo_run.status == 'success' %}
+                        <span class="inline-flex items-center gap-1 text-green-600">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                            OK
+                        </span>
+                        {% elif f.ultimo_run.status == 'running' %}
+                        <span class="inline-flex items-center gap-1 text-yellow-600">
+                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            Rodando
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 text-red-600">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+                            Erro
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right tabular-nums">{{ f.total_new }}</td>
+                    <td class="px-4 py-3 text-right tabular-nums text-green-600">{{ f.total_success }}</td>
+                    <td class="px-4 py-3 text-right tabular-nums text-red-600">{{ f.total_error }}</td>
+                    <td class="px-4 py-3 text-gray-500">
+                        {% if f.ultimo_run.started_at %}
+                        {{ f.ultimo_run.started_at.strftime('%d/%m/%Y %H:%M') }}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Últimas execuções -->
+    <h2 class="text-lg font-semibold mb-4">Últimas Execuções</h2>
+    <div class="overflow-hidden rounded-xl border bg-white shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b bg-gray-50 dark:bg-gray-800/50">
+                    <th class="px-4 py-3 text-left font-medium">Fonte</th>
+                    <th class="px-4 py-3 text-center font-medium">Status</th>
+                    <th class="px-4 py-3 text-right font-medium">Novos</th>
+                    <th class="px-4 py-3 text-right font-medium">Atualizados</th>
+                    <th class="px-4 py-3 text-left font-medium">Início</th>
+                    <th class="px-4 py-3 text-left font-medium">Fim</th>
+                    <th class="px-4 py-3 text-left font-medium">Erro</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y dark:divide-gray-800">
+                {% for run in runs %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                    <td class="px-4 py-3 font-medium">{{ run.fonte }}</td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="rounded-full px-2 py-0.5 text-xs font-medium
+                            {% if run.status == 'success' %}bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300
+                            {% elif run.status == 'running' %}bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300
+                            {% else %}bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300{% endif %}">
+                            {{ run.status }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-right tabular-nums">{{ run.total_new }}</td>
+                    <td class="px-4 py-3 text-right tabular-nums">{{ run.total_updated }}</td>
+                    <td class="px-4 py-3 text-gray-500">{{ run.started_at.strftime('%d/%m %H:%M') }}</td>
+                    <td class="px-4 py-3 text-gray-500">
+                        {{ run.finished_at.strftime('%d/%m %H:%M') if run.finished_at else '—' }}
+                    </td>
+                    <td class="px-4 py-3 text-red-600 text-xs max-w-xs truncate">
+                        {{ run.error_message or '' }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

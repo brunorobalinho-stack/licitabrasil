@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LicitaBrasil{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe',
+                            500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
+                            800: '#1e40af', 900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-full bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+    {% block body %}
+    <div class="flex h-full">
+        <!-- Sidebar (desktop) -->
+        <aside class="hidden md:flex md:w-64 md:flex-col bg-gray-900 text-white flex-shrink-0">
+            <div class="flex h-16 items-center px-6 border-b border-gray-800">
+                <span class="text-xl font-bold text-brand-500">LicitaBrasil</span>
+            </div>
+            {% include "partials/nav.html" %}
+        </aside>
+
+        <!-- Mobile sidebar overlay -->
+        <div id="mobile-sidebar" class="hidden fixed inset-0 z-40 md:hidden">
+            <div class="fixed inset-0 bg-black/50" onclick="document.getElementById('mobile-sidebar').classList.add('hidden')"></div>
+            <aside class="relative w-64 flex flex-col bg-gray-900 text-white h-full sidebar-slide">
+                <div class="flex h-16 items-center justify-between px-6 border-b border-gray-800">
+                    <span class="text-xl font-bold text-brand-500">LicitaBrasil</span>
+                    <button onclick="document.getElementById('mobile-sidebar').classList.add('hidden')" class="text-gray-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                {% include "partials/nav.html" %}
+            </aside>
+        </div>
+
+        <!-- Main content -->
+        <main class="flex-1 overflow-y-auto">
+            <!-- Mobile header -->
+            <header class="md:hidden flex items-center justify-between px-4 h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+                <button onclick="document.getElementById('mobile-sidebar').classList.remove('hidden')" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <span class="text-lg font-bold text-brand-600">LicitaBrasil</span>
+                {% if user %}
+                <a href="/logout" class="text-sm text-gray-500 hover:text-gray-700">Sair</a>
+                {% else %}
+                <span class="w-6"></span>
+                {% endif %}
+            </header>
+
+            <div class="p-6 lg:p-8">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    {% endblock %}
+</body>
+</html>

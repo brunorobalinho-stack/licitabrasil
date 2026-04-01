@@ -1,0 +1,42 @@
+/* LicitaBrasil — estilos extras */
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* HTMX loading indicator */
+.htmx-indicator {
+    opacity: 0;
+    transition: opacity 200ms ease-in;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+    opacity: 1;
+}
+
+/* HTMX: fade results while loading */
+.htmx-request #results-container {
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+}
+
+/* Mobile sidebar slide-in */
+.sidebar-slide {
+    animation: slideIn 200ms ease-out;
+}
+@keyframes slideIn {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(0); }
+}

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Dashboard — LicitaBrasil{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p class="mt-1 text-sm text-gray-500">Visao geral das licitacoes coletadas</p>
+    </div>
+
+    <!-- Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <p class="text-sm font-medium text-gray-500">Total Licitacoes</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900">{{ "{:,}".format(total)|replace(",", ".") }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <p class="text-sm font-medium text-gray-500">Documentos</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900">{{ "{:,}".format(total_docs)|replace(",", ".") }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <p class="text-sm font-medium text-gray-500">Valor Total Estimado</p>
+            <p class="mt-2 text-2xl font-bold text-gray-900">
+                {% if total_valor %}
+                R$ {{ "{:,.0f}".format(total_valor)|replace(",", ".") }}
+                {% else %}—{% endif %}
+            </p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <p class="text-sm font-medium text-gray-500">Fontes Ativas</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900">{{ total_fontes }}</p>
+        </div>
+    </div>
+
+    <!-- Fontes + Status Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Por Fonte -->
+        <div>
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Por Fonte</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {% for fonte, count in por_fonte.items() %}
+                <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ fonte }}</p>
+                    <p class="mt-1 text-xl font-bold text-blue-600">{{ "{:,}".format(count)|replace(",", ".") }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Por Status -->
+        {% if por_status %}
+        <div>
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Por Status</h2>
+            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div class="divide-y divide-gray-100">
+                    {% for st, count in por_status.items() %}
+                    <div class="flex items-center justify-between px-5 py-3">
+                        <span class="text-sm text-gray-700">{{ st }}</span>
+                        <span class="text-sm font-medium text-gray-900">{{ "{:,}".format(count)|replace(",", ".") }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Top Modalidades -->
+    {% if por_modalidade %}
+    <div>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Top Modalidades</h2>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div class="divide-y divide-gray-100">
+                {% for mod, count in por_modalidade.items() %}
+                <div class="flex items-center justify-between px-5 py-3">
+                    <span class="text-sm text-gray-700">{{ mod or "N/A" }}</span>
+                    <span class="text-sm font-medium text-gray-900">{{ "{:,}".format(count)|replace(",", ".") }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Licitacoes -->
+    <div>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Licitacoes Recentes</h2>
+            <a href="/licitacoes" class="text-sm font-medium text-brand-600 hover:text-brand-800 transition-colors">
+                Ver todas &rarr;
+            </a>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-gray-50 border-b border-gray-200">
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Numero</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Objeto</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">Orgao</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Modalidade</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Fonte</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for lic in recentes %}
+                        <tr class="hover:bg-blue-50/50 transition-colors cursor-pointer"
+                            onclick="window.location='/licitacoes/{{ lic.id }}'">
+                            <td class="px-4 py-3 text-gray-900 font-medium whitespace-nowrap">
+                                {{ lic.numero_processo[:25] }}{% if lic.numero_processo|length > 25 %}...{% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-gray-700 max-w-xs truncate" title="{{ lic.objeto }}">
+                                {{ lic.objeto[:100] }}{% if lic.objeto|length > 100 %}...{% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-gray-600 whitespace-nowrap hidden lg:table-cell">
+                                {{ (lic.orgao or "")[:25] }}{% if (lic.orgao or "")|length > 25 %}...{% endif %}
+                                {% if not lic.orgao %}<span class="text-gray-300">—</span>{% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-gray-600 whitespace-nowrap hidden md:table-cell">
+                                {{ (lic.modalidade or "")[:20] }}{% if (lic.modalidade or "")|length > 20 %}...{% endif %}
+                                {% if not lic.modalidade %}<span class="text-gray-300">—</span>{% endif %}
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                                    {{ lic.fonte }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                                Nenhuma licitacao encontrada.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

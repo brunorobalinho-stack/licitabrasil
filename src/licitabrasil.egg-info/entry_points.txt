@@ -1,0 +1,2 @@
+[console_scripts]
+licitabrasil = licitabrasil.cli.main:app

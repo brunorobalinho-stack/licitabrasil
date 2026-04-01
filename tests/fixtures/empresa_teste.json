@@ -1,0 +1,20 @@
+{
+    "cnpj": "12345678000190",
+    "razao_social": "Empresa Teste LTDA",
+    "cnaes": ["8121400", "8129000"],
+    "palavras_chave": ["limpeza", "conservacao", "manutencao predial", "servicos gerais"],
+    "valor_minimo": 10000,
+    "valor_maximo": 5000000,
+    "estados": ["PE", "PB", "AL"],
+    "municipios": ["RECIFE", "JOAO PESSOA"],
+    "modalidades": [],
+    "endereco": "Rua da Empresa, 123 - Recife/PE",
+    "telefone": "(81) 3333-4444",
+    "email": "contato@empresateste.com.br",
+    "representante_legal": "Jose da Silva",
+    "dados_bancarios": {
+        "banco": "Banco do Brasil",
+        "agencia": "1234-5",
+        "conta": "67890-1"
+    }
+}

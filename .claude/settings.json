@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "command": "if [[ \"$CLAUDE_FILE\" == *.py ]]; then python -m py_compile \"$CLAUDE_FILE\" && echo \"Sintaxe OK\" || echo \"ERRO de sintaxe\"; fi",
+            "description": "Verificar sintaxe Python apos cada edicao"
+          }
+        ]
+      }
+    ]
+  }
+}
