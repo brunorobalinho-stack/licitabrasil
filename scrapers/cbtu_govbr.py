@@ -157,14 +157,17 @@ class CBTUGovBRScraper:
         for part in reversed(parts):
             # Remove ano (ex: pregoes-2025 → pregoes)
             slug = re.sub(r"[-_]\d{4}$", "", part).lower()
-            slug = re.sub(r"^(pregoes|dispensas|concorrencias)", lambda m: m.group(1), slug)
             for key, modalidade in self.MODALIDADE_MAP.items():
                 if key in slug:
                     return modalidade
         return "Não identificada"
 
-    def _extract_numero_processo(self, titulo: str) -> str:
-        """Extrai número do processo do título (ex: 'Pregão 90027/2025' → '90027/2025')."""
+    def _extract_numero_processo(self, titulo: str) -> Optional[str]:
+        """Extrai número do processo do título (ex: 'Pregão 90027/2025' → '90027/2025').
+
+        Retorna None quando não encontra padrão reconhecível — evita poluir o DB
+        com títulos completos no campo numero_processo.
+        """
         # Padrões: 90027/2025, 90003-2025, 001/2025, nº 90003/2025
         match = re.search(r"n[º°]?\s*(\d[\d./-]+\d)", titulo, re.I)
         if match:
@@ -173,7 +176,7 @@ class CBTUGovBRScraper:
         match = re.search(r"(\d{2,5}[/.-]\d{4})", titulo)
         if match:
             return match.group(1)
-        return titulo
+        return None
 
     def _is_document_link(self, url: str) -> bool:
         """Verifica se o link é para um documento (não uma subpasta)."""
@@ -200,22 +203,31 @@ class CBTUGovBRScraper:
         unidades: Optional[list[str]] = None,
         max_items: int = 0,
     ) -> list[LicitacaoCBTU]:
-        """Scrape todas as unidades (ou lista específica)."""
+        """Scrape todas as unidades (ou lista específica).
+
+        max_items=0 desliga o limite. Quando > 0, o limite é propagado
+        para scrape_unidade/_navigate_folder e respeitado mid-fetch.
+        """
         targets = unidades or list(self.UNIDADES.keys())
-        all_results = []
+        all_results: list[LicitacaoCBTU] = []
 
         for slug in targets:
             if slug not in self.UNIDADES:
                 logger.warning(f"Unidade desconhecida: {slug}")
                 continue
+
+            remaining = max_items - len(all_results) if max_items > 0 else 0
+            if max_items > 0 and remaining <= 0:
+                break
+
             try:
-                results = await self.scrape_unidade(slug)
+                results = await self.scrape_unidade(slug, max_items=remaining)
                 all_results.extend(results)
                 logger.info(
                     f"{self.UNIDADES[slug]}: {len(results)} licitações encontradas"
                 )
             except Exception as e:
-                logger.error(f"Erro ao scraper {slug}: {e}")
+                logger.error(f"Erro ao raspar {slug}: {e}")
 
             if max_items > 0 and len(all_results) >= max_items:
                 all_results = all_results[:max_items]
@@ -223,14 +235,21 @@ class CBTUGovBRScraper:
 
         return all_results
 
-    async def scrape_unidade(self, slug: str) -> list[LicitacaoCBTU]:
-        """Scrape uma unidade específica, navegando recursivamente."""
+    async def scrape_unidade(
+        self, slug: str, max_items: int = 0
+    ) -> list[LicitacaoCBTU]:
+        """Scrape uma unidade específica, navegando recursivamente.
+
+        max_items > 0 interrompe a navegação assim que o limite é atingido.
+        """
         unidade_nome = self.UNIDADES.get(slug, slug)
         url = f"{self.BASE_URL}/{slug}"
-        logger.info(f"Scraping {unidade_nome} ({url})")
+        logger.info(f"Raspando {unidade_nome} ({url})")
 
-        results = []
-        await self._navigate_folder(url, slug, unidade_nome, results, depth=0)
+        results: list[LicitacaoCBTU] = []
+        await self._navigate_folder(
+            url, slug, unidade_nome, results, depth=0, max_items=max_items
+        )
         return results
 
     async def _navigate_folder(
@@ -240,8 +259,11 @@ class CBTUGovBRScraper:
         unidade_nome: str,
         results: list[LicitacaoCBTU],
         depth: int,
+        max_items: int = 0,
     ):
         """Navega recursivamente uma pasta Plone coletando processos."""
+        if max_items > 0 and len(results) >= max_items:
+            return
         if depth > 5:
             logger.warning(f"Max depth reached: {url}")
             return
@@ -269,8 +291,12 @@ class CBTUGovBRScraper:
 
         # É uma pasta intermediária — navegar subpastas
         for text, href in links:
+            if max_items > 0 and len(results) >= max_items:
+                return
             if self._is_subfolder_link(href, url):
-                await self._navigate_folder(href, unidade_slug, unidade_nome, results, depth + 1)
+                await self._navigate_folder(
+                    href, unidade_slug, unidade_nome, results, depth + 1, max_items=max_items
+                )
 
     def _parse_process_page(
         self,
@@ -362,7 +388,7 @@ class CBTUGovBRScraper:
         conn.execute("PRAGMA foreign_keys=ON")
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS licitacoes (
-                numero_processo TEXT NOT NULL,
+                numero_processo TEXT,
                 modalidade TEXT NOT NULL,
                 titulo TEXT,
                 unidade_slug TEXT,

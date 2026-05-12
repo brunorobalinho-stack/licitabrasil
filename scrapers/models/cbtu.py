@@ -57,7 +57,7 @@ def infer_status(documentos: list["DocumentoCBTU"]) -> str:
 
 
 class LicitacaoCBTU(BaseModel):
-    numero_processo: str
+    numero_processo: Optional[str] = None
     modalidade: str
     titulo: str
     unidade_slug: str
@@ -75,7 +75,7 @@ class LicitacaoCBTU(BaseModel):
     @property
     def hash_registro(self) -> str:
         content = (
-            f"{self.numero_processo}|{self.modalidade}|{self.titulo}|"
+            f"{self.numero_processo or ''}|{self.modalidade}|{self.titulo}|"
             f"{self.status}|{len(self.documentos)}"
         )
         return hashlib.md5(content.encode("utf-8")).hexdigest()[:16]

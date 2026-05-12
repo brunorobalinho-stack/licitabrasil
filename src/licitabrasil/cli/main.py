@@ -6,6 +6,7 @@ from licitabrasil.cli.alert import app as alert_app
 from licitabrasil.cli.extract import app as extract_app
 from licitabrasil.cli.generate import app as generate_app
 from licitabrasil.cli.match import app as match_app
+from licitabrasil.cli.monitor import app as monitor_app
 from licitabrasil.cli.scrape import app as scrape_app
 
 app = typer.Typer(
@@ -19,6 +20,7 @@ app.add_typer(extract_app, name="extract", help="Extrair dados de editais (PDF)"
 app.add_typer(match_app, name="match", help="Matching empresa × licitações")
 app.add_typer(generate_app, name="gerar", help="Gerar propostas e declarações")
 app.add_typer(alert_app, name="alertas", help="Gerenciar e executar alertas")
+app.add_typer(monitor_app, name="monitor", help="Monitor de prazos críticos (Argus)")
 
 
 @app.command()
