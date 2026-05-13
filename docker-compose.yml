@@ -8,12 +8,12 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_DB: licitabrasil
-      POSTGRES_USER: licitabrasil
-      POSTGRES_PASSWORD: licitabrasil_dev
+      POSTGRES_USER: ${POSTGRES_USER:-licitabrasil}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required. Generate with: openssl rand -base64 24}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U licitabrasil"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-licitabrasil}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,14 +44,14 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://licitabrasil:licitabrasil_dev@postgres:5432/licitabrasil
+      DATABASE_URL: postgresql://${POSTGRES_USER:-licitabrasil}:${POSTGRES_PASSWORD}@postgres:5432/licitabrasil
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: licitabrasil-jwt-secret-change-in-production
-      JWT_REFRESH_SECRET: licitabrasil-refresh-secret-change-in-production
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required. Generate with: openssl rand -base64 48}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required. Generate with: openssl rand -base64 48}
       PORT: "3001"
-      NODE_ENV: development
-      CORS_ORIGIN: http://localhost:5173
-      LOG_LEVEL: info
+      NODE_ENV: ${NODE_ENV:-development}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
 
   worker:
     build:
@@ -65,12 +65,12 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://licitabrasil:licitabrasil_dev@postgres:5432/licitabrasil
+      DATABASE_URL: postgresql://${POSTGRES_USER:-licitabrasil}:${POSTGRES_PASSWORD}@postgres:5432/licitabrasil
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: licitabrasil-jwt-secret-change-in-production
-      JWT_REFRESH_SECRET: licitabrasil-refresh-secret-change-in-production
-      NODE_ENV: development
-      LOG_LEVEL: info
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required. Generate with: openssl rand -base64 48}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required. Generate with: openssl rand -base64 48}
+      NODE_ENV: ${NODE_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
 
   frontend:
     build:
