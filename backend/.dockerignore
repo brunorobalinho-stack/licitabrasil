@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment (NEVER ship .env into an image)
+.env
+.env.local
+.env.*.local
+
+# Tests and coverage
+tests/
+coverage/
+*.test.ts
+*.spec.ts
+vitest.config.ts
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE / tooling
+.vscode/
+.idea/
+*.swp
+*.swo
+.eslintrc*
+.prettierrc*
+.editorconfig
+
+# Docker itself (no point shipping Dockerfile into the image)
+Dockerfile
+.dockerignore
+
+# Docs (image doesn't need them)
+*.md
+README*
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Prisma local files (the real schema is COPYed explicitly)
+prisma/*.db
+prisma/*.db-journal
