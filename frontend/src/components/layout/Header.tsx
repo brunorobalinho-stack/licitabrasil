@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Bell, Star, LayoutDashboard, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
+import { Search, LayoutDashboard, LogOut, Menu, X, Sun, Moon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../stores/auth-store';
 
@@ -35,16 +35,9 @@ export function Header() {
           <Link to="/dashboard" className="flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors">
             <LayoutDashboard size={16} /> Dashboard
           </Link>
-          {isAuthenticated && (
-            <>
-              <Link to="/favoritos" className="flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors">
-                <Star size={16} /> Favoritos
-              </Link>
-              <Link to="/alertas" className="flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors">
-                <Bell size={16} /> Alertas
-              </Link>
-            </>
-          )}
+          {/* TODO: re-enable /favoritos and /alertas links once the
+              corresponding pages exist in App.tsx. Backend endpoints
+              already exist (see backend/src/api/routes/{favoritos,alertas}.ts). */}
         </nav>
 
         {/* Right side */}
@@ -86,7 +79,12 @@ export function Header() {
         </div>
 
         {/* Mobile menu button */}
-        <button className="md:hidden p-2" onClick={() => setMobileOpen(!mobileOpen)}>
+        <button
+          className="md:hidden p-2"
+          onClick={() => setMobileOpen(!mobileOpen)}
+          aria-expanded={mobileOpen}
+          aria-label="Abrir menu"
+        >
           {mobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
@@ -97,11 +95,7 @@ export function Header() {
           <Link to="/" className="block py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>🔍 Buscar</Link>
           <Link to="/dashboard" className="block py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>📊 Dashboard</Link>
           {isAuthenticated && (
-            <>
-              <Link to="/favoritos" className="block py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>⭐ Favoritos</Link>
-              <Link to="/alertas" className="block py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>🔔 Alertas</Link>
-              <button onClick={handleLogout} className="block py-2 text-sm font-medium text-red-600">Sair</button>
-            </>
+            <button onClick={handleLogout} className="block py-2 text-sm font-medium text-red-600">Sair</button>
           )}
           {!isAuthenticated && (
             <Link to="/login" className="block py-2 text-sm font-medium text-primary" onClick={() => setMobileOpen(false)}>Entrar / Cadastrar</Link>
