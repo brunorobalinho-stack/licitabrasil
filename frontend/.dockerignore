@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment (NEVER ship .env into an image)
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE / tooling
+.vscode/
+.idea/
+*.swp
+*.swo
+.eslintrc*
+.prettierrc*
+.editorconfig
+
+# Docker itself
+Dockerfile
+.dockerignore
+
+# Docs
+*.md
+README*
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
