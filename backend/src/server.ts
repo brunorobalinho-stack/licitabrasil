@@ -27,7 +27,9 @@ app.use(pinoHttp({ logger }));
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(compression());
-app.use(express.json({ limit: '10mb' }));
+// Body limit kept tight: this API only receives filter/query bodies.
+// 100kb is plenty and closes the DoS vector that 10mb left open.
+app.use(express.json({ limit: '100kb' }));
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -35,14 +37,30 @@ app.use(rateLimit({
   legacyHeaders: false,
 }));
 
-// Health check
+// Health check (tests Postgres AND Redis)
 app.get('/api/health', async (_req, res) => {
+  const checks: Record<string, boolean> = { db: false, redis: false };
+
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    checks.db = true;
   } catch {
-    res.status(503).json({ status: 'error', message: 'Database unavailable' });
+    /* keep false */
   }
+
+  try {
+    const pong = await redis.ping();
+    checks.redis = pong === 'PONG';
+  } catch {
+    /* keep false */
+  }
+
+  const healthy = checks.db && checks.redis;
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'error',
+    checks,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Routes
