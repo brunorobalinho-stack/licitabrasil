@@ -63,18 +63,30 @@ async function tryRefreshToken(): Promise<boolean> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: refresh }),
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        // O servidor rejeitou o refresh token -- ele nao vai virar valido
+        // numa proxima tentativa. Limpa aqui, dentro da promise
+        // compartilhada, pra que qualquer 401 que chegue depois caia
+        // direto no `if (!refresh) return false` em vez de disparar uma
+        // cascata de /refresh com um token que ja se sabe morto.
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        return false;
+      }
       const data = await res.json();
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
       return true;
     } catch {
+      // Falha de rede: pode ser transiente. Nao limpa o token -- deixa
+      // uma tentativa futura acontecer.
       return false;
     }
   })();
 
   refreshingPromise = promise;
-  // Clear the singleton once it settles, so the next 401 burst can start fresh.
+  // Libera o singleton quando a promise assenta. Se o servidor rejeitou,
+  // o token ja foi limpo acima, entao a re-entrada e inofensiva.
   promise.finally(() => {
     refreshingPromise = null;
   });
