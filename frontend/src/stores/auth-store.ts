@@ -28,7 +28,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout() {
-    auth.logout();
+    // auth.logout() agora e async (chama /auth/logout pra expirar o
+    // cookie). A limpeza do estado local roda sincrona la dentro, antes
+    // do primeiro await, entao o void aqui nao perde nada visivel.
+    void auth.logout();
     set({ user: null, isAuthenticated: false });
   },
 

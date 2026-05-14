@@ -55,6 +55,7 @@ vi.mock('../../src/config/env.js', () => ({
 
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import cookieParser from 'cookie-parser';
 import { authRouter } from '../../src/api/routes/auth.js';
 import { errorHandler } from '../../src/api/middleware/error-handler.js';
 
@@ -67,10 +68,17 @@ let app: Express;
 beforeEach(() => {
   app = express();
   app.use(express.json());
+  app.use(cookieParser());
   app.use('/api/auth', authRouter);
   app.use(errorHandler);
   vi.clearAllMocks();
 });
+
+/** Verdadeiro se o Set-Cookie da resposta inclui o refresh token httpOnly. */
+function hasRefreshCookie(res: request.Response): boolean {
+  const cookies = res.headers['set-cookie'] ?? [];
+  return cookies.some((c) => c.startsWith('refreshToken=') && /httponly/i.test(c));
+}
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/register
@@ -95,7 +103,9 @@ describe('POST /api/auth/register', () => {
     expect(res.body.user).toBeDefined();
     expect(res.body.user.email).toBe('test@test.com');
     expect(res.body.accessToken).toBeDefined();
-    expect(res.body.refreshToken).toBeDefined();
+    // Refresh token sai em cookie httpOnly, nao no corpo.
+    expect(res.body.refreshToken).toBeUndefined();
+    expect(hasRefreshCookie(res)).toBe(true);
   });
 
   it('returns 409 when email is already registered', async () => {
@@ -148,7 +158,9 @@ describe('POST /api/auth/login', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.accessToken).toBeDefined();
-    expect(res.body.refreshToken).toBeDefined();
+    // Refresh token sai em cookie httpOnly, nao no corpo.
+    expect(res.body.refreshToken).toBeUndefined();
+    expect(hasRefreshCookie(res)).toBe(true);
     expect(res.body.user.email).toBe('user@test.com');
   });
 
@@ -181,36 +193,68 @@ describe('POST /api/auth/login', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /api/auth/refresh', () => {
-  it('returns new token pair for valid refresh token', async () => {
+  it('returns a new access token and rotates the cookie for a valid refresh token', async () => {
     const refreshToken = jwt.sign(
       { userId: 'u1', email: 'test@test.com' },
       'test-refresh-secret-32-chars!!!!',
       { expiresIn: '7d' },
     );
+    // /refresh agora confere se a conta ainda existe antes de re-emitir.
+    mockPrisma.usuario.findUnique.mockResolvedValue({ id: 'u1', email: 'test@test.com' });
 
     const res = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken });
+      .set('Cookie', `refreshToken=${refreshToken}`);
 
     expect(res.status).toBe(200);
     expect(res.body.accessToken).toBeDefined();
-    expect(res.body.refreshToken).toBeDefined();
+    // Refresh token novo vai no cookie rotacionado, nao no corpo.
+    expect(res.body.refreshToken).toBeUndefined();
+    expect(hasRefreshCookie(res)).toBe(true);
   });
 
-  it('returns 401 for invalid refresh token', async () => {
+  it('returns 401 when the refresh token belongs to a deleted account', async () => {
+    const refreshToken = jwt.sign(
+      { userId: 'gone', email: 'gone@test.com' },
+      'test-refresh-secret-32-chars!!!!',
+      { expiresIn: '7d' },
+    );
+    mockPrisma.usuario.findUnique.mockResolvedValue(null);
+
     const res = await request(app)
       .post('/api/auth/refresh')
-      .send({ refreshToken: 'garbage' });
+      .set('Cookie', `refreshToken=${refreshToken}`);
 
     expect(res.status).toBe(401);
   });
 
-  it('returns 400 when refreshToken is missing', async () => {
+  it('returns 401 for an invalid refresh token', async () => {
     const res = await request(app)
       .post('/api/auth/refresh')
-      .send({});
+      .set('Cookie', 'refreshToken=garbage');
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 401 when the refresh cookie is missing', async () => {
+    const res = await request(app).post('/api/auth/refresh');
+
+    expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/logout
+// ---------------------------------------------------------------------------
+
+describe('POST /api/auth/logout', () => {
+  it('clears the refresh cookie and returns 204', async () => {
+    const res = await request(app).post('/api/auth/logout');
+
+    expect(res.status).toBe(204);
+    // clearCookie emite um Set-Cookie com refreshToken vazio/expirado.
+    const cookies = res.headers['set-cookie'] ?? [];
+    expect(cookies.some((c) => c.startsWith('refreshToken='))).toBe(true);
   });
 });
 

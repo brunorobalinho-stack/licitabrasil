@@ -33,9 +33,34 @@ const loginSchema = z.object({
   senha: z.string().min(1, 'Senha é obrigatória'),
 });
 
-const refreshSchema = z.object({
-  refreshToken: z.string().min(1, 'Refresh token é obrigatório'),
-});
+// ---------------------------------------------------------------------------
+// Refresh token cookie
+// ---------------------------------------------------------------------------
+
+const REFRESH_COOKIE = 'refreshToken';
+
+// Flags do cookie do refresh token. httpOnly tira o token do alcance do
+// JS do navegador (logo, de XSS); path restrito a /api/auth pra ele nao
+// ser enviado pro resto da API; sameSite strict porque o /refresh so e
+// chamado pelo proprio app. set e clear compartilham essa base pra nao
+// driftarem -- se as flags divergirem, o browser ignora o clearCookie.
+const refreshCookieBase = {
+  httpOnly: true,
+  secure: env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+  path: '/api/auth',
+};
+
+function setRefreshCookie(res: Response, token: string): void {
+  res.cookie(REFRESH_COOKIE, token, {
+    ...refreshCookieBase,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7d, casado com JWT_REFRESH_EXPIRES_IN
+  });
+}
+
+function clearRefreshCookie(res: Response): void {
+  res.clearCookie(REFRESH_COOKIE, refreshCookieBase);
+}
 
 // ---------------------------------------------------------------------------
 // Helper: wrap async route handlers
@@ -86,10 +111,13 @@ router.post('/register', asyncHandler(async (req, res) => {
   });
 
   const tokens = generateTokens({ userId: user.id, email: user.email });
+  // Refresh token vai em cookie httpOnly; so o access token (curto, 15min)
+  // volta no corpo pro client guardar e mandar no header Authorization.
+  setRefreshCookie(res, tokens.refreshToken);
 
   res.status(201).json({
     user: { id: user.id, email: user.email, nome: user.nome, empresa: user.empresa, cnpj: user.cnpj },
-    ...tokens,
+    accessToken: tokens.accessToken,
   });
 }));
 
@@ -107,10 +135,11 @@ router.post('/login', asyncHandler(async (req, res) => {
   if (!valid) throw new AppError(401, 'Credenciais inválidas');
 
   const tokens = generateTokens({ userId: user.id, email: user.email });
+  setRefreshCookie(res, tokens.refreshToken);
 
   res.json({
     user: { id: user.id, email: user.email, nome: user.nome, empresa: user.empresa, cnpj: user.cnpj },
-    ...tokens,
+    accessToken: tokens.accessToken,
   });
 }));
 
@@ -119,16 +148,45 @@ router.post('/login', asyncHandler(async (req, res) => {
 // ---------------------------------------------------------------------------
 
 router.post('/refresh', asyncHandler(async (req, res) => {
-  const { refreshToken } = refreshSchema.parse(req.body);
+  const refreshToken = req.cookies?.[REFRESH_COOKIE];
+  if (!refreshToken) throw new AppError(401, 'Refresh token não encontrado');
 
+  let decoded: AuthPayload;
   try {
-    const decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as AuthPayload;
-    const tokens = generateTokens({ userId: decoded.userId, email: decoded.email });
-    res.json(tokens);
+    decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as AuthPayload;
   } catch {
+    // Token invalido/expirado: limpa o cookie morto pra os proximos
+    // /refresh pararem direto no `if (!refreshToken)` acima.
+    clearRefreshCookie(res);
     throw new AppError(401, 'Refresh token inválido ou expirado');
   }
+
+  // Autoridade: o refresh token e a credencial de 7 dias. Confirma que a
+  // conta ainda existe antes de re-emitir -- senao um usuario deletado
+  // renovaria o acesso pela semana inteira.
+  const user = await prisma.usuario.findUnique({
+    where: { id: decoded.userId },
+    select: { id: true, email: true },
+  });
+  if (!user) {
+    clearRefreshCookie(res);
+    throw new AppError(401, 'Conta não encontrada');
+  }
+
+  // Rotaciona: cada /refresh emite um par novo, inclusive o refresh.
+  const tokens = generateTokens({ userId: user.id, email: user.email });
+  setRefreshCookie(res, tokens.refreshToken);
+  res.json({ accessToken: tokens.accessToken });
 }));
+
+// ---------------------------------------------------------------------------
+// POST /logout
+// ---------------------------------------------------------------------------
+
+router.post('/logout', (_req, res) => {
+  clearRefreshCookie(res);
+  res.status(204).end();
+});
 
 // ---------------------------------------------------------------------------
 // GET /me
