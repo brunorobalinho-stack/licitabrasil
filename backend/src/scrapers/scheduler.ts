@@ -23,10 +23,23 @@ export function startScheduler(): void {
   // Without QD here, the first municipal pass had to wait up to 6 h.
   setTimeout(async () => {
     logger.info('Running initial scraping jobs (PNCP + Querido Diário)…');
-    await Promise.all([
-      scheduleScrapingJob('pncp', { pageSize: 50 }),
-      scheduleScrapingJob('querido-diario', { size: 50 }),
-    ]);
+    // allSettled, nao all: se um portal estiver fora, o outro ainda e
+    // agendado e a falha vira log. Com Promise.all a rejeicao de um job
+    // viraria unhandled rejection -- o outro ja foi disparado e ninguem
+    // mais o aguarda -- e podia derrubar o processo.
+    const jobs = [
+      { source: 'pncp', run: () => scheduleScrapingJob('pncp', { pageSize: 50 }) },
+      { source: 'querido-diario', run: () => scheduleScrapingJob('querido-diario', { size: 50 }) },
+    ];
+    const results = await Promise.allSettled(jobs.map((j) => j.run()));
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
+        logger.error(
+          { err: result.reason, source: jobs[i].source },
+          'Initial scraping job failed to schedule',
+        );
+      }
+    });
   }, 30_000);
 
   logger.info({ timezone: SCHEDULE_OPTS.timezone }, 'Scraping scheduler started');

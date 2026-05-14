@@ -44,15 +44,17 @@ app.get('/api/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     checks.db = true;
-  } catch {
-    /* keep false */
+  } catch (err) {
+    // Sem o log, o operador ve o 503 mas nao sabe a causa (conexao
+    // recusada? timeout? auth?). warn, nao error: e sinal operacional.
+    logger.warn({ err }, 'Health check: Postgres ping failed');
   }
 
   try {
     const pong = await redis.ping();
     checks.redis = pong === 'PONG';
-  } catch {
-    /* keep false */
+  } catch (err) {
+    logger.warn({ err }, 'Health check: Redis ping failed');
   }
 
   const healthy = checks.db && checks.redis;
