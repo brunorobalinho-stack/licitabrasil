@@ -23,7 +23,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...opts, headers });
 
   if (res.status === 401) {
-    // Try refresh
+    // Try refresh (singleton: parallel 401s share one /refresh call)
     const refreshed = await tryRefreshToken();
     if (refreshed) {
       headers.Authorization = `Bearer ${getToken()}`;
@@ -45,23 +45,52 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+// Module-level singleton so concurrent callers share one /refresh round-trip.
+// Without this, N parallel 401s caused N parallel /refresh calls; only the
+// last token pair survived and the rest of the in-flight requests retried
+// with already-rotated tokens.
+let refreshingPromise: Promise<boolean> | null = null;
+
 async function tryRefreshToken(): Promise<boolean> {
-  const refresh = localStorage.getItem('refreshToken');
-  if (!refresh) return false;
-  try {
-    const res = await fetch(`${BASE}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: refresh }),
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
-    return true;
-  } catch {
-    return false;
-  }
+  if (refreshingPromise) return refreshingPromise;
+
+  const promise = (async (): Promise<boolean> => {
+    const refresh = localStorage.getItem('refreshToken');
+    if (!refresh) return false;
+    try {
+      const res = await fetch(`${BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: refresh }),
+      });
+      if (!res.ok) {
+        // O servidor rejeitou o refresh token -- ele nao vai virar valido
+        // numa proxima tentativa. Limpa aqui, dentro da promise
+        // compartilhada, pra que qualquer 401 que chegue depois caia
+        // direto no `if (!refresh) return false` em vez de disparar uma
+        // cascata de /refresh com um token que ja se sabe morto.
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        return false;
+      }
+      const data = await res.json();
+      localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      return true;
+    } catch {
+      // Falha de rede: pode ser transiente. Nao limpa o token -- deixa
+      // uma tentativa futura acontecer.
+      return false;
+    }
+  })();
+
+  refreshingPromise = promise;
+  // Libera o singleton quando a promise assenta. Se o servidor rejeitou,
+  // o token ja foi limpo acima, entao a re-entrada e inofensiva.
+  promise.finally(() => {
+    refreshingPromise = null;
+  });
+  return promise;
 }
 
 export class ApiError extends Error {

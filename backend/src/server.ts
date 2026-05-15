@@ -23,9 +23,14 @@ const app = express();
 // Request logging
 app.use(pinoHttp({ logger }));
 
+// CORS: env var can be a single domain or a comma-separated list of domains,
+// so staging and prod can share the same image without rebuild.
+const corsOrigins = env.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean);
+const corsOrigin = corsOrigins.length <= 1 ? (corsOrigins[0] ?? false) : corsOrigins;
+
 // Middleware
 app.use(helmet());
-app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(compression());
 // Body limit kept tight: this API only receives filter/query bodies.
 // 100kb is plenty and closes the DoS vector that 10mb left open.
@@ -78,7 +83,7 @@ app.use('/api/fontes', fontesRouter);
 app.use(errorHandler);
 
 const server = app.listen(env.PORT, () => {
-  logger.info(`LicitaBrasil API running on port ${env.PORT}`);
+  logger.info({ corsOrigins }, `LicitaBrasil API running on port ${env.PORT}`);
 });
 
 // Graceful shutdown

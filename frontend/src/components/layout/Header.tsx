@@ -3,14 +3,26 @@ import { Search, LayoutDashboard, LogOut, Menu, X, Sun, Moon } from 'lucide-reac
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../stores/auth-store';
 
+const THEME_STORAGE_KEY = 'theme';
+
+function readInitialTheme(): boolean {
+  if (typeof window === 'undefined') return false;
+  const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (saved === 'dark') return true;
+  if (saved === 'light') return false;
+  // No preference saved yet — respect the OS setting.
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
 export function Header() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
+  const [dark, setDark] = useState<boolean>(readInitialTheme);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
+    window.localStorage.setItem(THEME_STORAGE_KEY, dark ? 'dark' : 'light');
   }, [dark]);
 
   const handleLogout = () => {

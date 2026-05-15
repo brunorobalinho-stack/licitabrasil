@@ -18,6 +18,17 @@ const scraperFactory: Record<string, () => PNCPScraper | QueridoDiarioScraper> =
 };
 
 // ---------------------------------------------------------------------------
+// Consecutive-failure tracking (per sourceName)
+// ---------------------------------------------------------------------------
+
+const consecutiveFailures = new Map<string, number>();
+const FAILURE_WARN_EVERY = 5;
+
+function sourceFromJob(job: Job | undefined): string {
+  return (job?.data as { sourceName?: string } | undefined)?.sourceName ?? 'unknown';
+}
+
+// ---------------------------------------------------------------------------
 // Worker
 // ---------------------------------------------------------------------------
 
@@ -48,11 +59,35 @@ const worker = new Worker(
 );
 
 worker.on('completed', (job, result) => {
-  logger.info({ jobId: job?.id, result }, 'Job completed');
+  const sourceName = sourceFromJob(job);
+  if (consecutiveFailures.get(sourceName)) {
+    consecutiveFailures.set(sourceName, 0);
+  }
+  logger.info({ jobId: job?.id, sourceName, result }, 'Job completed');
 });
 
 worker.on('failed', (job, err) => {
-  logger.error({ jobId: job?.id, err: err.message }, 'Job failed');
+  const sourceName = sourceFromJob(job);
+  const next = (consecutiveFailures.get(sourceName) ?? 0) + 1;
+  consecutiveFailures.set(sourceName, next);
+
+  logger.error(
+    {
+      jobId: job?.id,
+      sourceName,
+      consecutiveFailures: next,
+      err: err.message,
+      stack: err.stack,
+    },
+    'Scraping job failed',
+  );
+
+  if (next % FAILURE_WARN_EVERY === 0) {
+    logger.warn(
+      { sourceName, consecutiveFailures: next },
+      `Scraper "${sourceName}" hit ${next} consecutive failures — investigate the source or rate limits`,
+    );
+  }
 });
 
 worker.on('error', (err) => {
