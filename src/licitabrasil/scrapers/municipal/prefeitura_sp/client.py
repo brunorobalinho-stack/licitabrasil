@@ -16,8 +16,19 @@ class PrefeituraSPClient:
         self._client: Optional[httpx.AsyncClient] = None
 
     async def __aenter__(self):
+        # Separa connect (10s) de read (settings.request_timeout): o
+        # gargalo das modalidades grandes do PNCP e a fase de LEITURA da
+        # resposta (a API demora pra montar paginas com milhares de
+        # registros), nao a conexao. Sem essa separacao, um httpx.Timeout
+        # escalar aplicava o mesmo valor pra tudo e o connect ficava
+        # generoso demais sem que o read recebesse a folga necessaria.
         self._client = httpx.AsyncClient(
-            timeout=self.settings.request_timeout,
+            timeout=httpx.Timeout(
+                connect=10.0,
+                read=float(self.settings.request_timeout),
+                write=10.0,
+                pool=10.0,
+            ),
             headers={"User-Agent": self.settings.user_agent},
             follow_redirects=True,
         )

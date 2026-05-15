@@ -34,7 +34,12 @@ class Settings(BaseSettings):
     # Rate limiting
     max_concurrent: int = 3
     delay_seconds: float = 1.0
-    request_timeout: int = 30
+    # Bumped 30 -> 60 (Dia 0.5 #3): a API do PNCP demora pra computar
+    # paginas de modalidades grandes (Pregao Eletronico tem ~10k+ regs
+    # numa janela de 7d). 30s estourava no read da resposta. O cliente
+    # mapeia esse valor pro read timeout especificamente -- connect e
+    # write seguem em 10s.
+    request_timeout: int = 60
     max_retries: int = 3
 
     # Defaults
