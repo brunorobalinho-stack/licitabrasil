@@ -43,6 +43,20 @@ cd licitabrasil
 cp .env.example .env
 ```
 
+> **Nota sobre `radar-main`**
+>
+> O remote tem uma branch chamada `radar-main` que é uma **linhagem paralela** (snapshot do scraper Python radar, sem o `data/` no histórico). Não é evolução de `main` — não fazer merge entre as duas. Para clones limpos que ignoram essa branch:
+>
+> ```bash
+> git clone --single-branch -b main <repo-url> licitabrasil
+> ```
+>
+> Se já clonou tudo, pode excluir localmente de futuras fetches com:
+>
+> ```bash
+> git config --add remote.origin.fetch '^refs/heads/radar-main'
+> ```
+
 ### 2. Subir com Docker Compose (recomendado)
 
 ```bash
