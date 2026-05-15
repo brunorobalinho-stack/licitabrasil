@@ -83,6 +83,38 @@ SCRAPERS: dict[str, ScraperInfo] = {
         ),
         tags=("judiciario",),
     ),
+    "comprasnet": ScraperInfo(
+        name="comprasnet",
+        label="ComprasNet / Compras.gov.br — Compras Federais",
+        esfera="federal",
+        uf=None,
+        portal="compras.gov.br",
+        base_url="https://compras.gov.br/",
+        module="licitabrasil.scrapers.federal.comprasnet",
+        db_relpath="comprasnet/comprasnet.db",
+        description=(
+            "Compras Federais Lei 8.666 e 14.133 (sucessor do ComprasNet). "
+            "API oficial em dadosabertos.compras.gov.br complementa o PNCP "
+            "pra fontes legadas Lei 8.666 nao agregadas. Pareado com PNCP "
+            "(via prefeitura_sp) cobre o tronco federal do radar."
+        ),
+        tags=("federal", "alta-prioridade", "recon-pendente"),
+        enabled=False,
+        disabled_motivo=(
+            "Reservado 15/05/2026: scraper nao existe ainda, modulo "
+            "licitabrasil.scrapers.federal.comprasnet vazio. Flag fica "
+            "registrada aqui pro proximo sprint -- aparece em list_scrapers "
+            "como disabled. Caminho de implementacao previsto: "
+            "(1) Recon da API dadosabertos.compras.gov.br (endpoints, "
+            "pagination, rate limit, schema dos contratos / licitacoes / atas). "
+            "(2) Decidir cobertura: full historico Lei 8.666 (volume grande) "
+            "ou janela de N dias com refresh diario (recomendado pra MVP). "
+            "(3) Codar httpx + Pydantic v2 seguindo o template do JFPE "
+            "(API JSON, sem Playwright). (4) Storage SQLite padrao do projeto. "
+            "Tempo estimado: 1 dia de recon + 2-3 dias de codigo + testes. "
+            "Bruno marcou como flag pra proximo sprint -- nao Dia 0.5."
+        ),
+    ),
     "peintegrado": ScraperInfo(
         name="peintegrado",
         label="PE-Integrado — Portal de Compras de Pernambuco",
