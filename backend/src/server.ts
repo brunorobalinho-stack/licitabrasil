@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import pinoHttp from 'pino-http';
 import { env } from './config/env.js';
@@ -32,6 +33,9 @@ const corsOrigin = corsOrigins.length <= 1 ? (corsOrigins[0] ?? false) : corsOri
 app.use(helmet());
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(compression());
+// Le o cookie httpOnly do refresh token (rota /api/auth). O token nao
+// fica mais acessivel ao JS do navegador -- fora do alcance de XSS.
+app.use(cookieParser());
 // Body limit kept tight: this API only receives filter/query bodies.
 // 100kb is plenty and closes the DoS vector that 10mb left open.
 app.use(express.json({ limit: '100kb' }));

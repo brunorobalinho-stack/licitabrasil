@@ -20,19 +20,23 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     ...(opts.headers as Record<string, string> ?? {}),
   };
 
-  const res = await fetch(`${BASE}${path}`, { ...opts, headers });
+  // credentials: 'include' faz o navegador enviar o cookie httpOnly do
+  // refresh token. Ele e path-scoped em /api/auth, entao nas demais rotas
+  // nada e enviado -- e inofensivo deixar global.
+  const res = await fetch(`${BASE}${path}`, { ...opts, headers, credentials: 'include' });
 
   if (res.status === 401) {
     // Try refresh (singleton: parallel 401s share one /refresh call)
     const refreshed = await tryRefreshToken();
     if (refreshed) {
       headers.Authorization = `Bearer ${getToken()}`;
-      const retry = await fetch(`${BASE}${path}`, { ...opts, headers });
+      const retry = await fetch(`${BASE}${path}`, { ...opts, headers, credentials: 'include' });
       if (!retry.ok) throw new ApiError(retry.status, await retry.text());
       return retry.json();
     }
+    // O cookie do refresh token, se ainda existir, ja foi limpo pelo
+    // backend no /refresh. So resta limpar o access token local.
     localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
     window.location.href = '/login';
     throw new ApiError(401, 'Sessão expirada');
   }
@@ -55,31 +59,27 @@ async function tryRefreshToken(): Promise<boolean> {
   if (refreshingPromise) return refreshingPromise;
 
   const promise = (async (): Promise<boolean> => {
-    const refresh = localStorage.getItem('refreshToken');
-    if (!refresh) return false;
     try {
+      // O refresh token vive num cookie httpOnly -- o JS nao o le nem o
+      // envia. credentials: 'include' deixa o navegador anexa-lo.
       const res = await fetch(`${BASE}/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: refresh }),
+        credentials: 'include',
       });
       if (!res.ok) {
-        // O servidor rejeitou o refresh token -- ele nao vai virar valido
-        // numa proxima tentativa. Limpa aqui, dentro da promise
-        // compartilhada, pra que qualquer 401 que chegue depois caia
-        // direto no `if (!refresh) return false` em vez de disparar uma
-        // cascata de /refresh com um token que ja se sabe morto.
+        // O servidor rejeitou o cookie e ja o limpou na resposta. Logo, o
+        // proximo /refresh sai sem cookie e leva 401 na hora -- sem
+        // cascata de tentativas com uma credencial que ja se sabe morta.
+        // So resta descartar o access token local.
         localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
         return false;
       }
       const data = await res.json();
       localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
       return true;
     } catch {
-      // Falha de rede: pode ser transiente. Nao limpa o token -- deixa
-      // uma tentativa futura acontecer.
+      // Falha de rede: pode ser transiente. Nao mexe em nada -- deixa uma
+      // tentativa futura acontecer.
       return false;
     }
   })();
@@ -103,23 +103,23 @@ export class ApiError extends Error {
 // ── Auth ────────────────────────────────────────────────────────────────
 
 export const auth = {
+  // O backend devolve so o access token no corpo; o refresh token vem
+  // num cookie httpOnly via Set-Cookie, fora do alcance do JS.
   async login(email: string, senha: string) {
-    const data = await request<{ user: Usuario; accessToken: string; refreshToken: string }>(
+    const data = await request<{ user: Usuario; accessToken: string }>(
       '/auth/login',
       { method: 'POST', body: JSON.stringify({ email, senha }) },
     );
     localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
     return data.user;
   },
 
   async register(body: { email: string; nome: string; senha: string; empresa?: string; cnpj?: string }) {
-    const data = await request<{ user: Usuario; accessToken: string; refreshToken: string }>(
+    const data = await request<{ user: Usuario; accessToken: string }>(
       '/auth/register',
       { method: 'POST', body: JSON.stringify(body) },
     );
     localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
     return data.user;
   },
 
@@ -127,9 +127,16 @@ export const auth = {
     return request('/auth/me');
   },
 
-  logout() {
+  async logout() {
+    // Limpa o estado local primeiro (sincrono, antes do await), depois
+    // pede ao servidor pra expirar o cookie httpOnly. Best-effort: se a
+    // chamada falhar, o cookie expira sozinho.
     localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    try {
+      await fetch(`${BASE}/auth/logout`, { method: 'POST', credentials: 'include' });
+    } catch {
+      /* cookie expira sozinho */
+    }
   },
 
   isAuthenticated(): boolean {
