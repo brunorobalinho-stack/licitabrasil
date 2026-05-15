@@ -143,6 +143,51 @@ O sandbox isolado bloqueou o DNS de `licitacoes.compras.fiemg.com.br`. O scraper
 2. Mandar o `/tmp/fiemg.html` pra ajuste dos seletores no `parser.py`.
 3. Confirmar URL de listagem (chutei `/portal/processos-em-andamento` — pode ser diferente).
 
+## Bootstrap completo (uma linha)
+
+```bash
+cd ~/Projects/licitabrasil
+./scripts/setup-argus.sh
+```
+
+Esse script faz tudo:
+
+1. Cria/atualiza `.venv` e instala dependências
+2. Roda primeira sincronização dos 6 scrapers funcionais (CBTU, JFPE, Maceió, Natal, CE, SP)
+3. Renderiza e carrega o launchd plist em `~/Library/LaunchAgents/com.argus.licitabrasil.plist`
+4. Cria `~/Library/Logs/licitabrasil/` para os logs
+
+Variantes:
+
+```bash
+./scripts/setup-argus.sh --sync      # só ressincroniza (sem mexer launchd)
+./scripts/setup-argus.sh --launchd   # só (re)instala o agendamento
+./scripts/setup-argus.sh --unload    # desinstala o launchd
+```
+
+Verificar que está agendado:
+
+```bash
+launchctl list | grep com.argus
+tail -f ~/Library/Logs/licitabrasil/launchd.log
+```
+
+## PE-Integrado via Playwright (recomendado)
+
+A versão httpx pura não popula tabela (postback ASP.NET exige JS rodando).
+Pra extrair dados reais:
+
+```bash
+pip install '.[browser]'
+playwright install chromium
+
+# Listagem em andamento (pregões/concorrências)
+licitabrasil scrape run peintegrado sync --engine playwright --kind andamento --max-pages 3
+
+# Listagem de dispensa (CCD — onde a Argus mais aparece)
+licitabrasil scrape run peintegrado sync --engine playwright --kind dispensa --max-pages 5
+```
+
 ## Próximos passos sugeridos
 
 1. **Validar PE-Integrado / FIEMG** via `probe` (HTML real pode diferir

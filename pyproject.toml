@@ -37,6 +37,11 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.4",
 ]
+# Playwright para scrapers que dependem de JS/anti-bot:
+#   pip install '.[browser]' && playwright install chromium
+browser = [
+    "playwright>=1.40",
+]
 
 [project.scripts]
 licitabrasil = "licitabrasil.cli.main:app"

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  com.argus.licitabrasil.plist — launchd agent que roda 2x por dia útil:
+
+  • 06:00 — scrape all (atualiza SQLite dos 6 scrapers ativos)
+  • 07:33 — monitor briefing (gera /tmp/argus-briefing.md pra Claude)
+
+  Renderizado pelo scripts/setup-argus.sh — placeholders @@...@@ são
+  substituídos pelos paths reais do usuário antes do install.
+
+  Comandos manuais:
+    launchctl load -w  ~/Library/LaunchAgents/com.argus.licitabrasil.plist
+    launchctl unload   ~/Library/LaunchAgents/com.argus.licitabrasil.plist
+    launchctl list | grep com.argus
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.argus.licitabrasil</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>cd "@@PROJECT_ROOT@@" &amp;&amp; "@@LICITABRASIL@@" scrape all --tag cliente-argus &amp;&amp; "@@LICITABRASIL@@" monitor briefing --argus --dias 7 --saida /tmp/argus-briefing.md</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <!-- Segunda a sexta, 06:00 — scrape -->
+        <dict>
+            <key>Weekday</key><integer>1</integer>
+            <key>Hour</key><integer>6</integer>
+            <key>Minute</key><integer>0</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>2</integer>
+            <key>Hour</key><integer>6</integer>
+            <key>Minute</key><integer>0</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>3</integer>
+            <key>Hour</key><integer>6</integer>
+            <key>Minute</key><integer>0</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>4</integer>
+            <key>Hour</key><integer>6</integer>
+            <key>Minute</key><integer>0</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>5</integer>
+            <key>Hour</key><integer>6</integer>
+            <key>Minute</key><integer>0</integer>
+        </dict>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>@@PROJECT_ROOT@@</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>LANG</key>
+        <string>pt_BR.UTF-8</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>@@LOG_DIR@@/launchd.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>@@LOG_DIR@@/launchd.err</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>AbandonProcessGroup</key>
+    <true/>
+</dict>
+</plist>

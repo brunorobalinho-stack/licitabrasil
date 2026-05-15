@@ -43,11 +43,86 @@ def sync(
         True, "--details/--no-details", help="Buscar detalhes de cada processo"
     ),
     use_feed: bool = typer.Option(True, "--feed/--no-feed", help="Tentar RSS antes do HTML"),
+    engine: str = typer.Option(
+        "httpx",
+        "--engine",
+        help="'httpx' (rápido, mas não renderiza JS) ou 'playwright' (renderiza tudo)",
+    ),
+    kind: str = typer.Option(
+        "andamento",
+        "--kind",
+        help="andamento|dispensa|encerradas (válido apenas com --engine playwright)",
+    ),
     debug: bool = typer.Option(False, help="Debug logging"),
 ):
     """Sincroniza licitações do PE-Integrado para o SQLite local."""
     _setup_logging(debug)
-    asyncio.run(_sync(max_pages, fetch_details, use_feed))
+    if engine == "playwright":
+        asyncio.run(_sync_playwright(max_pages, fetch_details, kind))
+    else:
+        asyncio.run(_sync(max_pages, fetch_details, use_feed))
+
+
+async def _sync_playwright(max_pages: int, fetch_details: bool, kind: str) -> None:
+    """Sync usando Playwright — renderiza JS e captura tabela populada."""
+    from .client_playwright import PEIntegradoPlaywrightClient
+    from .models import Licitacao
+
+    settings = Settings()
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+
+    console.print(
+        Panel.fit(
+            f"[bold magenta]PE-Integrado Scraper (Playwright)[/bold magenta]\n"
+            f"Kind: {kind}\n"
+            f"DB: {settings.db_path}\n"
+            f"Início: {datetime.now():%d/%m/%Y %H:%M}",
+            border_style="magenta",
+        )
+    )
+
+    async with PEIntegradoPlaywrightClient(settings) as client:
+        htmls = await client.fetch_listing(kind=kind, max_pages=max_pages or 1)
+        console.print(f"[green]✓[/green] {len(htmls)} página(s) capturada(s)")
+
+        all_items = []
+        for i, html in enumerate(htmls, 1):
+            items = parse_listing(html)
+            console.print(f"  Página {i}: {len(items)} itens")
+            all_items.extend(items)
+
+        if not all_items:
+            console.print("[yellow]Nenhum item retornado.[/yellow]")
+            return
+
+        with Database(settings.db_path) as db:
+            counts = {"new": 0, "updated": 0, "unchanged": 0, "errors": 0}
+            for it in all_items:
+                try:
+                    if fetch_details:
+                        html = await client.fetch_detail(it.numero)
+                        lic = parse_detail(html, it.numero)
+                        lic.objeto_resumido = it.objeto_resumido or lic.objeto_resumido
+                        lic.url_processo = it.url
+                    else:
+                        lic = Licitacao.from_numero(
+                            it.numero,
+                            objeto_resumido=it.objeto_resumido,
+                            situacao=it.situacao,
+                            url_processo=it.url,
+                        )
+                    counts[db.upsert(lic)] += 1
+                except Exception as exc:
+                    logger.warning(f"Erro em {it.numero}: {exc}")
+                    counts["errors"] += 1
+
+            console.print(
+                f"\n[bold]Resumo:[/bold] [green]{counts['new']} novos[/green] / "
+                f"[yellow]{counts['updated']} atualizados[/yellow] / "
+                f"{counts['unchanged']} inalterados / "
+                f"[red]{counts['errors']} erros[/red]"
+            )
+            console.print(f"Total no banco: [bold]{db.count():,}[/bold]")
 
 
 async def _sync(max_pages: int, fetch_details: bool, use_feed: bool) -> None:
