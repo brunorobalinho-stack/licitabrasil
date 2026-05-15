@@ -21,8 +21,28 @@ export const cache = {
   async del(key: string): Promise<void> {
     await redis.del(key);
   },
+  /**
+   * Delete every key matching the glob pattern.
+   *
+   * Implementation uses SCAN instead of KEYS so Redis stays responsive
+   * even when there are millions of keys (KEYS is O(N) and blocks the
+   * single-threaded server for the entire duration).
+   */
   async invalidatePattern(pattern: string): Promise<void> {
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) await redis.del(...keys);
+    let cursor = '0';
+    const pipeline = redis.pipeline();
+    let toDelete = 0;
+    do {
+      const [nextCursor, batch] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = nextCursor;
+      for (const key of batch) {
+        pipeline.del(key);
+        toDelete += 1;
+      }
+    } while (cursor !== '0');
+
+    if (toDelete > 0) {
+      await pipeline.exec();
+    }
   },
 };

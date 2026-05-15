@@ -13,8 +13,15 @@ const router = Router();
 // Validation schemas
 // ---------------------------------------------------------------------------
 
+// Normalize email: trim whitespace, lowercase. Storing lowercase makes
+// `findUnique({ where: { email } })` reliable across capitalization.
+const emailField = z
+  .string()
+  .email('Email inválido')
+  .transform((s) => s.trim().toLowerCase());
+
 const registerSchema = z.object({
-  email: z.string().email('Email inválido'),
+  email: emailField,
   nome: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   senha: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
   empresa: z.string().optional(),
@@ -22,7 +29,7 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().email('Email inválido'),
+  email: emailField,
   senha: z.string().min(1, 'Senha é obrigatória'),
 });
 
