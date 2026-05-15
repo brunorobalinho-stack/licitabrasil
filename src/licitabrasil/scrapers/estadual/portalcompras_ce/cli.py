@@ -98,6 +98,19 @@ async def _sync(max_pages: int, resume: bool, reset: bool):
 
             # Step 3: Paginate remaining pages
             session_reset_interval = 500  # re-init session every N pages
+            # Guards anti-stuck (Bug Dia 0.5 #4):
+            # - consecutive_failures: exceptions seguidas. Resetado em
+            #   pagina ok. Threshold 10 aborta a corrida pra preservar
+            #   checkpoint no ultimo page real.
+            # - consecutive_empty: paginas que vieram vazias mesmo apos
+            #   reinit. Antes este caso CAIA pra db.save_progress(page)
+            #   incondicional -- checkpoint avancava com zero registros,
+            #   simulando progresso falso (sintoma "stuck").
+            consecutive_failures = 0
+            consecutive_empty = 0
+            EMPTY_ABORT_THRESHOLD = 3
+            FAILURE_ABORT_THRESHOLD = 10
+
             for page in range(start_page, total_pages + 1):
                 try:
                     # Re-init session periodically to avoid expiration
@@ -115,6 +128,32 @@ async def _sync(max_pages: int, resume: bool, reset: bool):
                         await client.reinit_session()
                         html = await client.fetch_listing_page(page)
                         records = parse_listing_page(html)
+
+                    if not records:
+                        # Vazio mesmo apos retry: causas possiveis sao
+                        # session expirada que reinit nao recuperou,
+                        # parser quebrado (HTML mudou), ou portal com
+                        # problema. NAO avanca checkpoint -- preserva o
+                        # last_page no ultimo page com dados.
+                        consecutive_empty += 1
+                        failed_pages += 1
+                        logger.error(
+                            f"Page {page}: vazia mesmo apos reinit "
+                            f"(consecutive_empty={consecutive_empty})"
+                        )
+                        if consecutive_empty >= EMPTY_ABORT_THRESHOLD:
+                            console.print(
+                                f"[red]Abortando: {EMPTY_ABORT_THRESHOLD} paginas "
+                                "vazias consecutivas. Portal pode estar com problema "
+                                "ou o parser quebrou. Checkpoint preservado no ultimo "
+                                "page com dados -- rode 'sync --resume' depois.[/red]"
+                            )
+                            break
+                        continue
+
+                    # Sucesso real: reseta os contadores anti-stuck.
+                    consecutive_empty = 0
+                    consecutive_failures = 0
 
                     for lic in records:
                         is_new, is_updated = db.upsert(lic)
@@ -135,10 +174,18 @@ async def _sync(max_pages: int, resume: bool, reset: bool):
                         )
 
                 except Exception as e:
+                    consecutive_failures += 1
                     failed_pages += 1
-                    logger.warning(f"Page {page} failed: {e}")
-                    if failed_pages > 10:
-                        console.print("[red]Muitas falhas consecutivas. Tente novamente mais tarde.[/red]")
+                    logger.warning(
+                        f"Page {page} failed: {e} "
+                        f"(consecutive_failures={consecutive_failures})"
+                    )
+                    if consecutive_failures >= FAILURE_ABORT_THRESHOLD:
+                        console.print(
+                            f"[red]Abortando: {FAILURE_ABORT_THRESHOLD} falhas "
+                            "consecutivas. Tente novamente mais tarde "
+                            "(checkpoint preservado no ultimo page ok).[/red]"
+                        )
                         break
                     # Try re-init on failure
                     try:
