@@ -276,6 +276,23 @@ describe('PNCPScraper', () => {
       expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
+    it('treats 204 No Content as an empty page without retrying', async () => {
+      // PNCP returns 204 when a modalidade has no records in the window.
+      // 204 is "ok" but has an empty body; calling res.json() would throw and
+      // trigger needless retries. It must be handled as an empty result.
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 204,
+        json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')),
+        text: () => Promise.resolve(''),
+      });
+
+      const results = await scraper.fetchLicitacoes({ pageSize: 10, codigoModalidadeContratacao: 6 });
+      expect(results).toHaveLength(0);
+      // Single call — no wasted retries on an empty result set.
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
     it('maps modalidadeId correctly', async () => {
       const cases = [
         { modalidadeId: 6, expected: 'PREGAO_ELETRONICO' },

@@ -194,6 +194,14 @@ export class PNCPScraper extends BaseScraper {
               throw new Error(`PNCP API returned ${res.status}: ${body.slice(0, 200)}`);
             }
 
+            // PNCP responde 204 No Content quando a modalidade não tem
+            // registros na janela de datas. 204 é "ok", mas o corpo é vazio:
+            // chamar res.json() lançaria, disparando retries e ruído de log.
+            // Tratamos como página vazia (encerra a paginação da modalidade).
+            if (res.status === 204) {
+              return { data: [] } as PNCPResponse;
+            }
+
             return res.json() as Promise<PNCPResponse>;
           }, `PNCP modalidade=${codModalidade} page=${page}`);
         } catch (err) {
